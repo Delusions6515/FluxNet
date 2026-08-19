@@ -19,7 +19,7 @@ jobs:
     name: Build
     uses: ./.github/workflows/build-module.yml
     with:
-      abi: all
+      abi: arm64-v8a
       kernel-channel: ${{ inputs.kernel-channel || 'delusions6515-pre' }}
       version: ''
       ref: ${{ github.ref }}
