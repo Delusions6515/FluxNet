@@ -10,6 +10,7 @@ import (
 	"github.com/Delusions6515/FluxNet/internal/app"
 	"github.com/Delusions6515/FluxNet/internal/config"
 	"github.com/Delusions6515/FluxNet/internal/health"
+	"github.com/Delusions6515/FluxNet/internal/logs"
 	"github.com/Delusions6515/FluxNet/internal/paths"
 	"github.com/Delusions6515/FluxNet/internal/result"
 	"github.com/Delusions6515/FluxNet/internal/service"
@@ -72,7 +73,7 @@ func usage() {
   %s [--json] [--module-dir <路径>] [--data-dir <路径>] [--timeout <秒>] <命令> [参数...]
 
 命令:
-  service start|stop|restart|status  服务生命周期管理
+  service start|stop|restart|status|logs  服务生命周期管理
   config apply                       组装运行配置
   subscription add|update|list|remove|switch  订阅管理
   worker start|stop                  后台 Worker
@@ -120,10 +121,12 @@ func cmdService(layout *paths.Layout, args []string) {
 		service.Stop(layout, jsonOutput)
 	case "restart":
 		service.Restart(layout, jsonOutput)
+	case "logs":
+		logs.Show(layout, jsonOutput)
 	case "status":
 		service.Status(layout, jsonOutput)
 	default:
-		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet service start|stop|restart|status")
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet service start|stop|restart|status|logs")
 	}
 }
 
