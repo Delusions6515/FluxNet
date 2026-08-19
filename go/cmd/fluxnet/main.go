@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 
+	"github.com/Delusions6515/FluxNet/internal/app"
 	"github.com/Delusions6515/FluxNet/internal/config"
 	"github.com/Delusions6515/FluxNet/internal/paths"
 	"github.com/Delusions6515/FluxNet/internal/result"
@@ -183,6 +184,25 @@ func cmdSubscription(layout *paths.Layout, args []string) {
 	}
 }
 
+// ---- App-list commands ----
+
+func cmdAppList(layout *paths.Layout, args []string) {
+	if len(args) == 0 {
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list update|show|upgrade")
+		return
+	}
+	switch args[0] {
+	case "update":
+		app.Update(layout, jsonOutput)
+	case "show":
+		app.Show(layout, jsonOutput)
+	case "upgrade":
+		app.Upgrade(layout, jsonOutput)
+	default:
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list update|show|upgrade")
+	}
+}
+
 // ---- Stubs ----
 
 func cmdWorker(layout *paths.Layout, args []string) {
@@ -191,8 +211,4 @@ func cmdWorker(layout *paths.Layout, args []string) {
 
 func cmdHealth(layout *paths.Layout, args []string) {
 	result.Err(jsonOutput, "not_implemented", "health 尚未实现")
-}
-
-func cmdAppList(layout *paths.Layout, args []string) {
-	result.Err(jsonOutput, "not_implemented", "app-list 尚未实现")
 }
