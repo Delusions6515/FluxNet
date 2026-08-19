@@ -137,7 +137,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: build/cache
-          key: fluxnet-${{ runner.os }}-${{ matrix.abi }}-${{ inputs.kernel-channel }}-${{ needs.metadata.outputs.build-type }}
+          key: fluxnet-${{ runner.os }}-${{ matrix.abi }}-${{ inputs.kernel-channel }}
 
       - name: Build module
         env:
