@@ -89,8 +89,24 @@ func Run(layout *paths.Layout) {
 			}
 
 			// Config monitoring: detect change → write .config-changed marker
-			// (deferred to hot-reload logic in a later commit)
 			checkConfigChange(layout, &lastConfigChange)
+
+			// Hot-reload: .config-changed → config apply → service restart (debounce 3s)
+			if _, err := os.Stat(layout.ConfigChangedMarker()); err == nil {
+				if time.Since(lastConfigChange) > debounceDur {
+					config.Apply(layout, false)
+					service.Restart(layout, false)
+					os.Remove(layout.ConfigChangedMarker())
+					lastConfigChange = time.Now()
+				}
+			}
+
+			// Hot-reload: modules_update → wait for swap → config apply → restart
+			if _, err := os.Stat(layout.ModulesUpdateDir()); err == nil {
+				time.Sleep(2 * time.Second)
+				config.Apply(layout, false)
+				service.Restart(layout, false)
+			}
 
 			// Network change monitoring (poll /data/misc/net/rt_tables mtime)
 			if fi, err := os.Stat("/data/misc/net/rt_tables"); err == nil {
