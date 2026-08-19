@@ -9,6 +9,7 @@ import (
 
 	"github.com/Delusions6515/FluxNet/internal/paths"
 	"github.com/Delusions6515/FluxNet/internal/result"
+	"github.com/Delusions6515/FluxNet/internal/service"
 )
 
 var (
@@ -102,15 +103,28 @@ func cmdVersion() {
 	}
 }
 
-// ---- Stubs for remaining subcommands (implemented in later commits) ----
+// ---- Service commands ----
 
 func cmdService(layout *paths.Layout, args []string) {
 	if len(args) == 0 {
-		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet service start|stop|restart|status")
+		service.Status(layout, jsonOutput)
 		return
 	}
-	result.Err(jsonOutput, "not_implemented", "service "+args[0]+" 尚未实现")
+	switch args[0] {
+	case "start":
+		service.Start(layout, jsonOutput)
+	case "stop":
+		service.Stop(layout, jsonOutput)
+	case "restart":
+		service.Restart(layout, jsonOutput)
+	case "status":
+		service.Status(layout, jsonOutput)
+	default:
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet service start|stop|restart|status")
+	}
 }
+
+// ---- Stubs for remaining subcommands (implemented in later commits) ----
 
 func cmdConfig(layout *paths.Layout, args []string) {
 	result.Err(jsonOutput, "not_implemented", "config 尚未实现")
