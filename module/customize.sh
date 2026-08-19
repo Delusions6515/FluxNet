@@ -87,6 +87,7 @@ else
     if ask_cover_bin; then
       ui_print "- 已选择覆盖: 用包内版本覆盖现有 sing-box"
       cp -f "$MODPATH/bin/sing-box" "$BIN_DIR/sing-box"
+      cp -f "$MODPATH/bin/kernel_version" "$BIN_DIR/kernel_version"
       chmod 755 "$BIN_DIR/sing-box"
     else
       ui_print "- 已选择跳过: 保留现有 sing-box"
@@ -106,6 +107,7 @@ else
     if ask_cover_bin; then
       ui_print "- 已选择覆盖: 用包内版本覆盖现有 atp"
       cp -f "$MODPATH/bin/atp" "$BIN_DIR/atp"
+      cp -f "$MODPATH/bin/atp_version" "$BIN_DIR/atp_version"
       chmod 755 "$BIN_DIR/atp"
     else
       ui_print "- 已选择跳过: 保留现有 atp"
@@ -153,16 +155,16 @@ if [ ! -f "$LOCAL_CONFIG_DIR/default.json" ]; then
   "log": {"level": "info"},
   "dns": {
     "servers": [
-      {"tag": "dns-local", "address": "223.5.5.5", "detour": "direct"}
+      {"tag": "dns-local", "address": "223.5.5.5"}
     ]
   },
   "inbounds": [],
   "outbounds": [
     {"tag": "direct", "type": "direct"},
-    {"tag": "proxy", "type": "selector", "outbounds": ["direct"]}
   ],
   "route": {
     "rules": [],
+    "final": "direct",
     "auto_detect_interface": true
   }
 }
