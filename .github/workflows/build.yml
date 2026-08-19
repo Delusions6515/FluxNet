@@ -1,0 +1,45 @@
+name: Build FluxNet
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [arm64-v8a, armeabi-v7a, x86_64]
+        channel: [delusions6515-pre]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Shell syntax check
+        run: |
+          for f in module/*.sh module/scripts/*.sh; do
+            [ -f "$f" ] && sh -n "$f" && echo "OK: $f" || echo "FAIL: $f"
+          done
+
+      - name: Go build & vet
+        run: |
+          cd go
+          go vet ./...
+          go test ./...
+
+      - name: Build module
+        run: |
+          chmod +x build.sh
+          TARGET_ABI=${{ matrix.arch }} KERNEL_CHANNEL=${{ matrix.channel }} ./build.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FluxNet-${{ matrix.arch }}-${{ matrix.channel }}
+          path: build/*.zip
