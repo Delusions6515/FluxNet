@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Delusions6515/FluxNet/internal/config"
 	"github.com/Delusions6515/FluxNet/internal/paths"
 	"github.com/Delusions6515/FluxNet/internal/result"
 )
@@ -91,6 +92,14 @@ func Start(layout *paths.Layout, formatJSON bool) {
 	// Read mode from config for output
 	mode := readProxyMode(layout)
 
+	// Tun hotspot forwarding
+	tunForwardRead := readConfigBool(layout, "tun_forward")
+	if mode == "tun" && tunForwardRead {
+		if err := config.TunForwardEnable(layout); err != nil {
+			fmt.Fprintf(os.Stderr, "[Warn] tun hotspot 启用失败: %s\n", err)
+		}
+	}
+
 	data := StatusData{
 		PID:     svcCmd.Process.Pid,
 		Running: true,
@@ -141,6 +150,11 @@ func Stop(layout *paths.Layout, formatJSON bool) {
 
 	// Restore Private DNS
 	restorePrivateDns(layout)
+
+	// Tun hotspot forwarding cleanup
+	if mode := readProxyMode(layout); mode == "tun" && readConfigBool(layout, "tun_forward") {
+		config.TunForwardDisable(layout)
+	}
 
 	// Cleanup atp rules for tproxy/redirect modes
 	mode := readProxyMode(layout)
@@ -320,6 +334,26 @@ func cleanupAtp(layout *paths.Layout) {
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	_ = cmd.Run()
+}
+
+// readConfigBool reads a boolean-ish config key from sing-box.config (1/0 or true/false).
+func readConfigBool(layout *paths.Layout, key string) bool {
+	data, err := os.ReadFile(layout.ConfigFile())
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "#") || line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, key+"=") {
+			val := strings.TrimPrefix(line, key+"=")
+			val = strings.Trim(val, "\"'")
+			return val == "1" || val == "true"
+		}
+	}
+	return false
 }
 
 // ---- Private DNS management ----
