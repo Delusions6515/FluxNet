@@ -9,10 +9,12 @@ import (
 
 	"github.com/Delusions6515/FluxNet/internal/app"
 	"github.com/Delusions6515/FluxNet/internal/config"
+	"github.com/Delusions6515/FluxNet/internal/health"
 	"github.com/Delusions6515/FluxNet/internal/paths"
 	"github.com/Delusions6515/FluxNet/internal/result"
 	"github.com/Delusions6515/FluxNet/internal/service"
 	"github.com/Delusions6515/FluxNet/internal/subscription"
+	"github.com/Delusions6515/FluxNet/internal/worker"
 )
 
 var (
@@ -106,8 +108,6 @@ func cmdVersion() {
 	}
 }
 
-// ---- Service commands ----
-
 func cmdService(layout *paths.Layout, args []string) {
 	if len(args) == 0 {
 		service.Status(layout, jsonOutput)
@@ -127,8 +127,6 @@ func cmdService(layout *paths.Layout, args []string) {
 	}
 }
 
-// ---- Config commands ----
-
 func cmdConfig(layout *paths.Layout, args []string) {
 	if len(args) == 0 || args[0] == "apply" {
 		config.Apply(layout, jsonOutput)
@@ -136,8 +134,6 @@ func cmdConfig(layout *paths.Layout, args []string) {
 	}
 	result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config apply")
 }
-
-// ---- Subscription commands ----
 
 func cmdSubscription(layout *paths.Layout, args []string) {
 	if len(args) == 0 {
@@ -184,7 +180,22 @@ func cmdSubscription(layout *paths.Layout, args []string) {
 	}
 }
 
-// ---- App-list commands ----
+func cmdWorker(layout *paths.Layout, args []string) {
+	if len(args) == 0 {
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet worker start|stop")
+		return
+	}
+	switch args[0] {
+	case "start":
+		worker.Start(layout, jsonOutput)
+	case "stop":
+		worker.Stop(layout, jsonOutput)
+	case "run":
+		worker.Run(layout)
+	default:
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet worker start|stop")
+	}
+}
 
 func cmdAppList(layout *paths.Layout, args []string) {
 	if len(args) == 0 {
@@ -203,12 +214,6 @@ func cmdAppList(layout *paths.Layout, args []string) {
 	}
 }
 
-// ---- Stubs ----
-
-func cmdWorker(layout *paths.Layout, args []string) {
-	result.Err(jsonOutput, "not_implemented", "worker 尚未实现")
-}
-
 func cmdHealth(layout *paths.Layout, args []string) {
-	result.Err(jsonOutput, "not_implemented", "health 尚未实现")
+	health.Check(layout, jsonOutput)
 }
