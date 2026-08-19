@@ -1,0 +1,6 @@
+id=fluxnet
+name=FluxNet
+version=${versionName}
+versionCode=${versionCode}
+author=Delusions6515
+description=Transparent proxy for Android based on sing-box. Supports Magisk/KernelSU/APatch.

@@ -1,0 +1,6 @@
+{
+  "type": "redirect",
+  "tag": "redirect-in",
+  "listen": "::",
+  "listen_port": 1536
+}
