@@ -11,6 +11,7 @@ import (
 	"github.com/Delusions6515/FluxNet/internal/paths"
 	"github.com/Delusions6515/FluxNet/internal/result"
 	"github.com/Delusions6515/FluxNet/internal/service"
+	"github.com/Delusions6515/FluxNet/internal/subscription"
 )
 
 var (
@@ -135,11 +136,54 @@ func cmdConfig(layout *paths.Layout, args []string) {
 	result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config apply")
 }
 
-// ---- Stubs for remaining subcommands (implemented in later commits) ----
+// ---- Subscription commands ----
 
 func cmdSubscription(layout *paths.Layout, args []string) {
-	result.Err(jsonOutput, "not_implemented", "subscription 尚未实现")
+	if len(args) == 0 {
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet subscription add|update|list|remove|switch")
+		return
+	}
+	switch args[0] {
+	case "add":
+		urlOrPath := ""
+		name := ""
+		if len(args) > 1 {
+			urlOrPath = args[1]
+		}
+		if len(args) > 2 {
+			name = args[2]
+		}
+		if urlOrPath == "" {
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet subscription add <url|path> [name]")
+			return
+		}
+		subscription.Add(layout, jsonOutput, urlOrPath, name)
+	case "update":
+		name := ""
+		if len(args) > 1 {
+			name = args[1]
+		}
+		subscription.Update(layout, jsonOutput, name)
+	case "list":
+		subscription.List(layout, jsonOutput)
+	case "remove":
+		if len(args) < 2 {
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet subscription remove <name>")
+			return
+		}
+		subscription.Remove(layout, jsonOutput, args[1])
+	case "switch":
+		if len(args) < 2 {
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet subscription switch <name>")
+			return
+		}
+		subscription.Switch(layout, jsonOutput, args[1])
+	default:
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet subscription add|update|list|remove|switch")
+	}
 }
+
+// ---- Stubs ----
 
 func cmdWorker(layout *paths.Layout, args []string) {
 	result.Err(jsonOutput, "not_implemented", "worker 尚未实现")
