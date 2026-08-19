@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      abi:
+        description: 'Target ABI (all = all architectures)'
+        default: all
+        type: choice
+        options: [all, arm64-v8a, armeabi-v7a, x86_64, x86]
+      version:
+        description: 'Version override (blank = git describe)'
+        default: ''
+      kernel-channel:
+        description: 'sing-box kernel channel'
+        default: delusions6515-pre
+        type: choice
+        options: [delusions6515-pre, delusions6515-stable, ref1nd-pre, ref1nd-stable, official-pre, official-stable]
+  push:
+    branches: [main, dev]
+    paths:
+      - 'build.sh'
+      - 'go/**'
+      - 'module/**'
+      - '.github/workflows/*.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/build-module.yml
+    with:
+      abi: ${{ inputs.abi || 'all' }}
+      kernel-channel: ${{ inputs.kernel-channel || 'delusions6515-pre' }}
+      version: ${{ inputs.version || '' }}
+      ref: ${{ github.ref }}
+      event-name: ${{ github.event_name }}
+
+  publish:
+    name: Publish nightly release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create or update nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+          VERSION_CODE: ${{ needs.build.outputs.version-code }}
+          BUILD_TYPE: ${{ needs.build.outputs.build-type }}
+          TIMESTAMP: ${{ github.event.head_commit.timestamp || 'manual' }}
+        run: |
+          echo "version=$VERSION  code=$VERSION_CODE  type=$BUILD_TYPE"
+          ls -lh dist/
+
+          gh release delete nightly --cleanup-tag -y || true
+          sleep 2
+
+          gh release create nightly \
+            --prerelease \
+            --title "Nightly ($VERSION)" \
+            --notes "自动构建产物，仅保留最新版本。
+
+            版本: \`$VERSION\` (build $VERSION_CODE)
+            类型: $BUILD_TYPE
+            时间: $TIMESTAMP
+
+            [构建日志](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" \
+            dist/*.zip
+

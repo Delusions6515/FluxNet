@@ -1,0 +1,158 @@
+name: Build Module (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      abi:
+        type: string
+        default: 'all'
+      kernel-channel:
+        type: string
+        default: 'delusions6515-pre'
+      version:
+        type: string
+        default: ''
+      ref:
+        type: string
+        description: 'GITHUB_REF from caller'
+      event-name:
+        type: string
+        description: 'github.event_name from caller'
+    outputs:
+      version:
+        value: ${{ jobs.metadata.outputs.version }}
+      version-code:
+        value: ${{ jobs.metadata.outputs.version-code }}
+      build-type:
+        value: ${{ jobs.metadata.outputs.build-type }}
+      is-prerelease:
+        value: ${{ jobs.metadata.outputs.is-prerelease }}
+
+permissions:
+  contents: read
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      abi-matrix: ${{ steps.meta.outputs.abi-matrix }}
+      version: ${{ steps.meta.outputs.version }}
+      version-code: ${{ steps.meta.outputs.version-code }}
+      build-type: ${{ steps.meta.outputs.build-type }}
+      is-prerelease: ${{ steps.meta.outputs.is-prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - id: meta
+        shell: bash
+        run: |
+          # ---------- ABI matrix ----------
+          if [ "${{ inputs.abi }}" = "all" ]; then
+            echo 'abi-matrix=["arm64-v8a","armeabi-v7a","x86_64","x86"]' >> "$GITHUB_OUTPUT"
+          else
+            printf 'abi-matrix=["%s"]\n' "${{ inputs.abi }}" >> "$GITHUB_OUTPUT"
+          fi
+
+          # ---------- Version ----------
+          ref="${{ inputs.ref }}"
+          version="${{ inputs.version }}"
+          if [ -z "$version" ] && [[ "$ref" == refs/tags/v* ]]; then
+            version="${ref#refs/tags/}"
+          fi
+          version="${version#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          # ---------- Version code (commit count) ----------
+          version_code=$(git rev-list HEAD --count)
+          echo "version-code=$version_code" >> "$GITHUB_OUTPUT"
+
+          # ---------- Build type & prerelease ----------
+          event="${{ inputs.event-name }}"
+          is_prerelease=false
+          build_type=release
+
+          if [ "$event" = "workflow_dispatch" ] \
+            || [ "$ref" = "refs/heads/main" ] \
+            || [ "$ref" = "refs/heads/dev" ]; then
+            build_type=canary
+          elif [[ "$version" =~ -(alpha|beta|rc)([.-]|$) ]]; then
+            is_prerelease=true
+            build_type=prerelease
+          elif [[ "$version" == *-hotfix* ]]; then
+            build_type=hotfix
+          fi
+
+          echo "build-type=$build_type" >> "$GITHUB_OUTPUT"
+          echo "is-prerelease=$is_prerelease" >> "$GITHUB_OUTPUT"
+
+  check:
+    needs: metadata
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+
+      - name: Shell syntax check
+        run: |
+          status=0
+          for f in module/*.sh module/scripts/*.sh; do
+            [ -f "$f" ] || continue
+            if sh -n "$f" 2>&1; then echo "  OK: $f"; else echo "  FAIL: $f"; status=1; fi
+          done
+          exit $status
+
+      - name: Go vet & test
+        run: |
+          cd go
+          go vet ./...
+          go test ./...
+
+  build:
+    needs: [metadata, check]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: ${{ fromJSON(needs.metadata.outputs.abi-matrix) }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+
+      - name: Install dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zip unzip xz-utils
+
+      - name: Cache downloaded components
+        uses: actions/cache@v6
+        with:
+          path: build/cache
+          key: fluxnet-${{ runner.os }}-${{ matrix.abi }}-${{ inputs.kernel-channel }}-${{ needs.metadata.outputs.build-type }}
+
+      - name: Build module
+        env:
+          TARGET_ABI: ${{ matrix.abi }}
+          KERNEL_CHANNEL: ${{ inputs.kernel-channel }}
+          BUILD_TYPE: ${{ needs.metadata.outputs.build-type }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          chmod +x build.sh
+          ./build.sh "${{ needs.metadata.outputs.version }}"
+          ls -lh build/*.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: FluxNet-${{ matrix.abi }}
+          path: build/*.zip
+          if-no-files-found: error
