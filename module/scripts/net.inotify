@@ -1,0 +1,29 @@
+#!/system/bin/sh
+# ============================================================
+# FluxNet - 网络变化防回环 (inotifyd 触发)
+# 监听 /data/misc/net 写事件，重新应用 atp 反回环规则。
+# ============================================================
+
+events=$1
+
+scripts_dir=$(dirname "$(realpath "$0")")
+. "$scripts_dir/lib.sh"
+load_config
+
+if [ "$events" != "w" ]; then
+    exit 0
+fi
+
+# 从配置文件读取代理模式
+mode=$(sed -n 's/^proxy_mode=//p' "$USER_CONFIG_FILE" 2>/dev/null | head -1)
+mode=$(echo "$mode" | tr -d "\"' ")
+mode="${mode:-tproxy}"
+
+case "$mode" in
+    tproxy|redirect)
+        if [ -f "$atp_bin" ] && [ -d "$runtime_tproxy_dir" ]; then
+            "$atp_bin" -d "$runtime_tproxy_dir" stop >/dev/null 2>&1
+            "$atp_bin" -d "$runtime_tproxy_dir" start >/dev/null 2>&1
+        fi
+        ;;
+esac

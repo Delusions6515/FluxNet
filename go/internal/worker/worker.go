@@ -17,13 +17,13 @@ import (
 )
 
 const (
-	pollInterval = 5 * time.Second
-	debounceDur  = 3 * time.Second
+	configPollInterval = 3 * time.Second
+	hotReloadInterval  = 1 * time.Second
+	debounceDur        = 3 * time.Second
 )
 
 // Start launches the background worker process.
 func Start(layout *paths.Layout, formatJSON bool) {
-	// Fork worker
 	fluxnetBin := layout.FluxNetBin()
 	cmd := exec.Command(fluxnetBin, "--data-dir", layout.DataDir, "--module-dir", layout.ModuleDir, "worker", "run")
 	cmd.Stdout = os.Stderr
@@ -61,64 +61,97 @@ func Run(layout *paths.Layout) {
 		service.Start(layout, false)
 	}
 
-	// Setup inotifyd for module dir monitoring
-	startInotify(layout)
+	// ---- inotifyd monitors ----
+	// 1. Module disable/remove (inotifyd)
+	startInotifyModule(layout)
 
-	// Main event loop
+	// 2. Network change → re-apply atp anti-loopback rules (inotifyd)
+	startInotifyNet(layout)
+
+	// ---- Main event loop ----
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
 
 	var lastConfigChange time.Time
-	var lastNetChange time.Time
+	var lastHotReload time.Time
 
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
+	// Config polling: detect changes to sing-box.config / tproxy.conf
+	cfgTicker := time.NewTicker(configPollInterval)
+	defer cfgTicker.Stop()
+
+	hotTicker := time.NewTicker(hotReloadInterval)
+	defer hotTicker.Stop()
 
 	for {
 		select {
 		case <-sigCh:
 			return
-		case <-ticker.C:
-			// Module monitoring: disable → stop; remove → stop + mark
+
+		case <-cfgTicker.C:
+			// Module disable/remove safety net
 			if _, err := os.Stat(layout.ModuleDir + "/disable"); err == nil {
 				service.Stop(layout, false)
 			}
 			if _, err := os.Stat(layout.ModuleDir + "/remove"); err == nil {
 				service.Stop(layout, false)
-				// Mark removed so user is aware
 			}
 
-			// Config monitoring: detect change → write .config-changed marker
+			// Config change → write .config-changed marker
 			checkConfigChange(layout, &lastConfigChange)
 
-			// Hot-reload: .config-changed → config apply → service restart (debounce 3s)
+		case <-hotTicker.C:
+			// Hot-reload: .config-changed → config apply → restart (debounce 3s)
 			if _, err := os.Stat(layout.ConfigChangedMarker()); err == nil {
-				if time.Since(lastConfigChange) > debounceDur {
+				if time.Since(lastHotReload) > debounceDur {
 					config.Apply(layout, false)
 					service.Restart(layout, false)
 					os.Remove(layout.ConfigChangedMarker())
-					lastConfigChange = time.Now()
+					lastHotReload = time.Now()
 				}
 			}
 
-			// Hot-reload: modules_update → wait for swap → config apply → restart
+			// modules_update → wait for swap → restart
 			if _, err := os.Stat(layout.ModulesUpdateDir()); err == nil {
 				time.Sleep(2 * time.Second)
 				config.Apply(layout, false)
 				service.Restart(layout, false)
 			}
+		}
+	}
+}
 
-			// Network change monitoring (poll /data/misc/net/rt_tables mtime)
-			if fi, err := os.Stat("/data/misc/net/rt_tables"); err == nil {
-				if fi.ModTime().After(lastNetChange) {
-					lastNetChange = fi.ModTime()
-					// Re-apply atp rules for tproxy/redirect
-					mode := readProxyMode(layout)
-					if mode == "tproxy" || mode == "redirect" {
-						cleanupAtp(layout)
-						applyAtp(layout)
-					}
-				}
+// ---- inotifyd helpers ----
+
+func startInotifyModule(layout *paths.Layout) {
+	script := layout.ScriptsDir() + "/fluxnet.inotify"
+	os.WriteFile(script, []byte("d:^((?!disable|remove).)*$:0\nd:disable:1\nd:remove:1\n"), 0755)
+	cmd := exec.Command("inotifyd", script, layout.ModuleDir)
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	_ = cmd.Start()
+}
+
+func startInotifyNet(layout *paths.Layout) {
+	netInotify := layout.ScriptsDir() + "/net.inotify"
+	cmd := exec.Command("inotifyd", netInotify, "/data/misc/net")
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	_ = cmd.Start()
+}
+
+// ---- config change detection (Go polling) ----
+
+func checkConfigChange(layout *paths.Layout, last *time.Time) {
+	paths := []string{layout.ConfigFile(), layout.TproxyConf()}
+	for _, p := range paths {
+		fi, err := os.Stat(p)
+		if err != nil {
+			continue
+		}
+		if fi.ModTime().After(*last) {
+			if time.Since(*last) > debounceDur {
+				*last = fi.ModTime()
+				os.WriteFile(layout.ConfigChangedMarker(), []byte("1"), 0644)
 			}
 		}
 	}
@@ -137,35 +170,6 @@ func autostartEnabled(layout *paths.Layout) bool {
 	return true
 }
 
-func checkConfigChange(layout *paths.Layout, last *time.Time) {
-	// Watch sing-box.config and tproxy.conf for changes
-	paths := []string{layout.ConfigFile(), layout.TproxyConf()}
-	for _, p := range paths {
-		fi, err := os.Stat(p)
-		if err != nil {
-			continue
-		}
-		if fi.ModTime().After(*last) {
-			if time.Since(*last) > debounceDur {
-				*last = fi.ModTime()
-				// Write .config-changed marker — hot-reload logic in a later commit
-				os.WriteFile(layout.ConfigChangedMarker(), []byte("1"), 0644)
-			}
-		}
-	}
-}
-
-func startInotify(layout *paths.Layout) {
-	// Write inotify script for module dir monitoring
-	inotifyScript := fmt.Sprintf("%s/scripts/fluxnet.inotify", layout.ScriptsDir())
-	os.WriteFile(inotifyScript, []byte("d:^((?!disable|remove).)*$:0\nd:disable:1\nd:remove:1\n"), 0755)
-
-	cmd := exec.Command("inotifyd", inotifyScript, layout.ModuleDir)
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	_ = cmd.Start()
-}
-
 func readWorkerPID(layout *paths.Layout) int {
 	data, _ := os.ReadFile(layout.WorkerPidFile())
 	pid, _ := strconv.Atoi(strings.TrimSpace(string(data)))
@@ -175,21 +179,6 @@ func readWorkerPID(layout *paths.Layout) int {
 func processAlive(pid int) bool {
 	_, err := os.Stat(fmt.Sprintf("/proc/%d", pid))
 	return err == nil
-}
-
-func readProxyMode(layout *paths.Layout) string {
-	data, err := os.ReadFile(layout.ConfigFile())
-	if err != nil {
-		return "unknown"
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "proxy_mode=") {
-			val := strings.TrimPrefix(line, "proxy_mode=")
-			return strings.Trim(val, "\"'")
-		}
-	}
-	return "unknown"
 }
 
 func readConfigKV(path string) map[string]string {
@@ -213,26 +202,4 @@ func readConfigKV(path string) map[string]string {
 		kv[key] = val
 	}
 	return kv
-}
-
-func cleanupAtp(layout *paths.Layout) {
-	atpBin := layout.AtpBin()
-	if _, err := os.Stat(atpBin); os.IsNotExist(err) {
-		return
-	}
-	cmd := exec.Command(atpBin, "-d", layout.RunTproxyDir(), "stop")
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	_ = cmd.Run()
-}
-
-func applyAtp(layout *paths.Layout) {
-	atpBin := layout.AtpBin()
-	if _, err := os.Stat(atpBin); os.IsNotExist(err) {
-		return
-	}
-	cmd := exec.Command(atpBin, "-d", layout.RunTproxyDir(), "start")
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	_ = cmd.Run()
 }
