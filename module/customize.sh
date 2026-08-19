@@ -155,7 +155,7 @@ if [ ! -f "$LOCAL_CONFIG_DIR/default.json" ]; then
   "log": {"level": "info"},
   "dns": {
     "servers": [
-      {"tag": "dns-local", "address": "223.5.5.5"}
+      {"tag": "local", "type": "udp", "server": "223.5.5.5"}
     ]
   },
   "inbounds": [],
