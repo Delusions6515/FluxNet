@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 
+	"github.com/Delusions6515/FluxNet/internal/config"
 	"github.com/Delusions6515/FluxNet/internal/paths"
 	"github.com/Delusions6515/FluxNet/internal/result"
 	"github.com/Delusions6515/FluxNet/internal/service"
@@ -124,11 +125,17 @@ func cmdService(layout *paths.Layout, args []string) {
 	}
 }
 
-// ---- Stubs for remaining subcommands (implemented in later commits) ----
+// ---- Config commands ----
 
 func cmdConfig(layout *paths.Layout, args []string) {
-	result.Err(jsonOutput, "not_implemented", "config 尚未实现")
+	if len(args) == 0 || args[0] == "apply" {
+		config.Apply(layout, jsonOutput)
+		return
+	}
+	result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config apply")
 }
+
+// ---- Stubs for remaining subcommands (implemented in later commits) ----
 
 func cmdSubscription(layout *paths.Layout, args []string) {
 	result.Err(jsonOutput, "not_implemented", "subscription 尚未实现")
