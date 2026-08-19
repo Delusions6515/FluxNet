@@ -2,9 +2,6 @@
 # ============================================================
 # FluxNet - 安装脚本
 # 由 Magisk / KernelSU / APatch 安装器在解压并设置默认权限后 source
-# 参考:
-#   https://topjohnwu.github.io/Magisk/guides.html
-#   https://kernelsu.org/guide/module.html
 # ============================================================
 
 # 仅支持在管理器内安装
@@ -67,8 +64,7 @@ ask_cover_bin() {
 # ---------- 二进制 ----------
 # fluxnet: 始终从包内覆盖模块目录
 ui_print "- 安装 fluxnet CLI"
-cp -f "$MODPATH/bin/fluxnet" "$MODDIR/bin/fluxnet" 2>/dev/null || abort "! fluxnet 二进制缺失"
-chmod 755 "$MODDIR/bin/fluxnet"
+[ -f "$MODPATH/bin/fluxnet" ] || abort "! fluxnet 二进制缺失"
 
 # sing-box / atp: 首次直接复制，升级时询问
 # build.sh 已将它们下载到 MODPATH/bin/ 暂存
@@ -185,7 +181,7 @@ fi
 
 # ---------- 权限 ----------
 set_perm_recursive "$MODPATH" 0 0 0755 0644
-chmod 755 "$MODDIR/bin/fluxnet" 2>/dev/null
+chmod 755 "$MODPATH/bin/fluxnet" 2>/dev/null
 chmod 755 "$BIN_DIR/sing-box" 2>/dev/null
 chmod 755 "$BIN_DIR/atp" 2>/dev/null
 set_perm "$CONFIG_DIR/sing-box.config" 0 0 0600 2>/dev/null
