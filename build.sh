@@ -162,7 +162,7 @@ else
   VER_CODE=1
   VER_HASH="nogit"
 fi
-BUILD_TYPE="release"
+BUILD_TYPE="${BUILD_TYPE:-release}"
 VERSION_LINE="$VER_NAME ($VER_CODE-$VER_HASH-$BUILD_TYPE)"
 sed -i "s/^version=.*/version=$VERSION_LINE/; s/^versionCode=.*/versionCode=$VER_CODE/" "$STAGE/module.prop"
 info "版本: $VERSION_LINE (versionCode: $VER_CODE)"
