@@ -177,6 +177,11 @@ func (l *Layout) LogsDir() string {
 	return filepath.Join(l.DataDir, "logs")
 }
 
+// PrivateDnsStateFile returns the backup file for Android Private DNS mode.
+func (l *Layout) PrivateDnsStateFile() string {
+	return filepath.Join(l.RunDir(), ".private_dns_mode")
+}
+
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil

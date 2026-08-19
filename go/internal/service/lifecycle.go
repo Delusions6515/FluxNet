@@ -61,6 +61,9 @@ func Start(layout *paths.Layout, formatJSON bool) {
 		return
 	}
 
+	// Disable Private DNS to prevent DNS leaks
+	savePrivateDns(layout)
+
 	// Start sing-box
 	ctx, cancel := context.WithTimeout(context.Background(), serviceStartTimeout)
 	defer cancel()
@@ -135,6 +138,9 @@ func Stop(layout *paths.Layout, formatJSON bool) {
 	}
 
 	os.Remove(layout.PidFile())
+
+	// Restore Private DNS
+	restorePrivateDns(layout)
 
 	// Cleanup atp rules for tproxy/redirect modes
 	mode := readProxyMode(layout)
@@ -314,4 +320,34 @@ func cleanupAtp(layout *paths.Layout) {
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	_ = cmd.Run()
+}
+
+// ---- Private DNS management ----
+// Android Private DNS must be disabled during proxy operation to prevent DNS leaks.
+// On start we save the current mode and set it to "off"; on stop we restore it.
+
+func savePrivateDns(layout *paths.Layout) {
+	current, err := exec.Command("/system/bin/settings", "get", "global", "private_dns_mode").Output()
+	if err != nil {
+		return
+	}
+	mode := strings.TrimSpace(string(current))
+	if mode == "" || mode == "null" || mode == "off" {
+		return
+	}
+	os.WriteFile(layout.PrivateDnsStateFile(), []byte(mode), 0600)
+	exec.Command("/system/bin/settings", "put", "global", "private_dns_mode", "off").Run()
+}
+
+func restorePrivateDns(layout *paths.Layout) {
+	data, err := os.ReadFile(layout.PrivateDnsStateFile())
+	if err != nil {
+		return
+	}
+	saved := strings.TrimSpace(string(data))
+	if saved == "" {
+		return
+	}
+	os.Remove(layout.PrivateDnsStateFile())
+	exec.Command("/system/bin/settings", "put", "global", "private_dns_mode", saved).Run()
 }
