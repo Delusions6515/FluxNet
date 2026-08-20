@@ -3,9 +3,6 @@ name: Build Module (Reusable)
 on:
   workflow_call:
     inputs:
-      abi:
-        type: string
-        default: 'arm64-v8a'
       kernel-channel:
         type: string
         default: 'delusions6515-pre'
@@ -35,7 +32,6 @@ jobs:
   metadata:
     runs-on: ubuntu-latest
     outputs:
-      abi-matrix: ${{ steps.meta.outputs.abi-matrix }}
       version: ${{ steps.meta.outputs.version }}
       version-code: ${{ steps.meta.outputs.version-code }}
       build-type: ${{ steps.meta.outputs.build-type }}
@@ -48,13 +44,6 @@ jobs:
       - id: meta
         shell: bash
         run: |
-          # ---------- ABI matrix ----------
-          if [ "${{ inputs.abi }}" = "all" ]; then
-            echo 'abi-matrix=["arm64-v8a","armeabi-v7a","x86_64","x86"]' >> "$GITHUB_OUTPUT"
-          else
-            printf 'abi-matrix=["%s"]\n' "${{ inputs.abi }}" >> "$GITHUB_OUTPUT"
-          fi
-
           # ---------- Version ----------
           ref="${{ inputs.ref }}"
           version="${{ inputs.version }}"
@@ -98,6 +87,8 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: '1.26'
+          cache: true
+          cache-dependency-path: go/go.mod
 
       - name: Shell syntax check
         run: |
@@ -117,10 +108,6 @@ jobs:
   build:
     needs: [metadata, check]
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        abi: ${{ fromJSON(needs.metadata.outputs.abi-matrix) }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -129,6 +116,8 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: '1.26'
+          cache: true
+          cache-dependency-path: go/go.mod
 
       - name: Install dependencies
         run: sudo apt-get update -qq && sudo apt-get install -y -qq zip unzip xz-utils
@@ -137,11 +126,11 @@ jobs:
         uses: actions/cache@v6
         with:
           path: build/cache
-          key: fluxnet-${{ runner.os }}-${{ matrix.abi }}-${{ inputs.kernel-channel }}
+          key: fluxnet-${{ runner.os }}-${{ inputs.kernel-channel }}
 
       - name: Build module
         env:
-          TARGET_ABI: ${{ matrix.abi }}
+          TARGET_ABI: arm64-v8a
           KERNEL_CHANNEL: ${{ inputs.kernel-channel }}
           BUILD_TYPE: ${{ needs.metadata.outputs.build-type }}
           GITHUB_TOKEN: ${{ github.token }}
@@ -153,6 +142,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: FluxNet-${{ matrix.abi }}
+          name: FluxNet-arm64-v8a
           path: build/*.zip
           if-no-files-found: error

@@ -9,7 +9,7 @@
 #   ./build.sh 1.0.0 out.zip    # 指定版本名和输出路径
 #
 # 环境变量:
-#   TARGET_ABI        目标 ABI: arm64-v8a(默认)|armeabi-v7a|x86_64|x86
+#   TARGET_ABI        目标 ABI: arm64-v8a (默认且唯一支持)
 #   KERNEL_CHANNEL    内核渠道: delusions6515-pre(默认)|delusions6515-stable|
 #                               ref1nd-pre|ref1nd-stable|official-stable|official-pre
 #   OUT_DIR           输出目录 (默认 ./build)
@@ -46,10 +46,7 @@ api_get() {
 
 # ---------- ABI 映射 ----------
 case "$TARGET_ABI" in
-  arm64-v8a)   SINGBOX_ARCH="arm64"; GOARCH="arm64"; GOARM=""  ;;
-  armeabi-v7a) SINGBOX_ARCH="arm";   GOARCH="arm";   GOARM="7" ;;
-  x86_64)      SINGBOX_ARCH="amd64"; GOARCH="amd64"; GOARM=""  ;;
-  x86)         SINGBOX_ARCH="386";   GOARCH="386";   GOARM=""  ;;
+  arm64-v8a) SINGBOX_ARCH="arm64"; GOARCH="arm64"; GOARM="" ;;
   *) die "不支持的 TARGET_ABI: $TARGET_ABI" ;;
 esac
 info "目标: $TARGET_ABI (sing-box: $SINGBOX_ARCH, go: $GOARCH${GOARM:+ ARMv$GOARM})  渠道: $KERNEL_CHANNEL"

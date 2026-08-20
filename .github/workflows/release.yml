@@ -19,7 +19,6 @@ jobs:
     name: Build
     uses: ./.github/workflows/build-module.yml
     with:
-      abi: arm64-v8a
       kernel-channel: ${{ inputs.kernel-channel || 'delusions6515-pre' }}
       version: ''
       ref: ${{ github.ref }}
@@ -102,7 +101,7 @@ jobs:
           code="$VERSION_CODE"
           sha=$(git rev-parse --short HEAD)
           mkdir -p json-out
-          for abi in arm64-v8a armeabi-v7a x86_64 x86; do
+          for abi in arm64-v8a; do
             zip="FluxNet-${version}-${code}-${sha}-${BUILD_TYPE}-${abi}.zip"
             cat > "json-out/update-${abi}.json" <<JSON
           {
@@ -135,4 +134,3 @@ jobs:
           else
             echo "update JSON and changelog unchanged; skipping push"
           fi
-

@@ -3,11 +3,6 @@ name: CI
 on:
   workflow_dispatch:
     inputs:
-      abi:
-        description: 'Target ABI'
-        default: arm64-v8a
-        type: choice
-        options: [arm64-v8a]
       version:
         description: 'Version override (blank = git describe)'
         default: ''
@@ -36,7 +31,6 @@ jobs:
     name: Build
     uses: ./.github/workflows/build-module.yml
     with:
-      abi: ${{ inputs.abi || 'arm64-v8a' }}
       kernel-channel: ${{ inputs.kernel-channel || 'delusions6515-pre' }}
       version: ${{ inputs.version || '' }}
       ref: ${{ github.ref }}
@@ -81,4 +75,3 @@ jobs:
 
             [构建日志](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" \
             dist/*.zip
-
