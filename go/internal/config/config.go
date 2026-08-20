@@ -34,7 +34,10 @@ func ApplyRuntime(layout *paths.Layout) (string, error) {
 	kv := readConfigKV(layout.ConfigFile())
 	mode := kv["proxy_mode"]
 	if mode == "" {
-		mode = "tproxy"
+		mode = "tun"
+	}
+	if mode != "tun" && mode != "tproxy" && mode != "redirect" && mode != "ebpf" {
+		return "", fmt.Errorf("不支持的代理模式: %s", mode)
 	}
 
 	// 1. Load active full config from subscription.json

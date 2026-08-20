@@ -271,7 +271,7 @@ func uptimeTicks() int64 {
 }
 
 func readProxyMode(layout *paths.Layout) string {
-	// Parse sing-box.config for proxy_mode=...
+	// Parse fluxnet.config for proxy_mode=...
 	data, err := os.ReadFile(layout.ConfigFile())
 	if err != nil {
 		return "unknown"
@@ -305,7 +305,7 @@ func cleanupAtp(layout *paths.Layout) {
 	_ = cmd.Run()
 }
 
-// readConfigBool reads a boolean-ish config key from sing-box.config (1/0 or true/false).
+// readConfigBool reads a boolean-ish config key from fluxnet.config (1/0 or true/false).
 func readConfigBool(layout *paths.Layout, key string) bool {
 	data, err := os.ReadFile(layout.ConfigFile())
 	if err != nil {

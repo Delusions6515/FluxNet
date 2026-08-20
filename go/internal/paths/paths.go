@@ -50,9 +50,9 @@ func (l *Layout) ModTproxyConf() string {
 	return filepath.Join(l.ModuleDir, "config", "tproxy.conf")
 }
 
-// ModSingBoxConfig returns the default sing-box.config shipped with the module.
-func (l *Layout) ModSingBoxConfig() string {
-	return filepath.Join(l.ModuleDir, "config", "sing-box.config")
+// ModFluxNetConfig returns the default fluxnet.config shipped with the module.
+func (l *Layout) ModFluxNetConfig() string {
+	return filepath.Join(l.ModuleDir, "config", "fluxnet.config")
 }
 
 // ScriptsDir returns the module scripts directory.
@@ -79,11 +79,11 @@ func (l *Layout) ConfigDir() string {
 
 // ConfigFile returns the user settings file (data dir preferred, module fallback).
 func (l *Layout) ConfigFile() string {
-	dataConfig := filepath.Join(l.ConfigDir(), "sing-box.config")
+	dataConfig := filepath.Join(l.ConfigDir(), "fluxnet.config")
 	if fileExists(dataConfig) {
 		return dataConfig
 	}
-	return l.ModSingBoxConfig()
+	return l.ModFluxNetConfig()
 }
 
 // LocalConfigDir returns local/ full-config directory.

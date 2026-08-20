@@ -73,7 +73,7 @@ func Run(layout *paths.Layout) {
 	var lastConfigChange time.Time
 	var lastHotReload time.Time
 
-	// Config polling: detect changes to sing-box.config / tproxy.conf
+	// Config polling: detect changes to fluxnet.config / tproxy.conf
 	cfgTicker := time.NewTicker(configPollInterval)
 	defer cfgTicker.Stop()
 

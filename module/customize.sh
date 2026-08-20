@@ -120,14 +120,14 @@ rm -f "$MODPATH/bin/sing-box" "$MODPATH/bin/atp" 2>/dev/null
 
 # ---------- 配置文件 (仅在不存在时写入) ----------
 
-# sing-box.config: 从模块模板复制，按设备 ABI 设置默认 kernel_abi
-if [ ! -f "$CONFIG_DIR/sing-box.config" ]; then
-  ui_print "- 写入默认配置文件 sing-box.config"
-  cp -f "$MODPATH/config/sing-box.config" "$CONFIG_DIR/sing-box.config"
+# fluxnet.config: 从模块模板复制，按设备 ABI 设置默认 kernel_abi
+if [ ! -f "$CONFIG_DIR/fluxnet.config" ]; then
+  ui_print "- 写入默认配置文件 fluxnet.config"
+  cp -f "$MODPATH/config/fluxnet.config" "$CONFIG_DIR/fluxnet.config"
   ABI=$(getprop ro.product.cpu.abi 2>/dev/null)
   case "$ABI" in
     arm64-v8a|armeabi-v7a|x86_64|x86)
-      sed -i "s/^kernel_abi=.*/kernel_abi=\"$ABI\"/" "$CONFIG_DIR/sing-box.config"
+      sed -i "s/^kernel_abi=.*/kernel_abi=\"$ABI\"/" "$CONFIG_DIR/fluxnet.config"
       ui_print "- 已按设备架构设置 kernel_abi=$ABI"
       ;;
     *) ui_print "! 无法识别设备 ABI ($ABI), 保持默认 arm64-v8a" ;;
@@ -186,7 +186,7 @@ set_perm_recursive "$MODPATH" 0 0 0755 0644
 chmod 755 "$MODPATH/bin/fluxnet" 2>/dev/null
 chmod 755 "$BIN_DIR/sing-box" 2>/dev/null
 chmod 755 "$BIN_DIR/atp" 2>/dev/null
-set_perm "$CONFIG_DIR/sing-box.config" 0 0 0600 2>/dev/null
+set_perm "$CONFIG_DIR/fluxnet.config" 0 0 0600 2>/dev/null
 set_perm "$CONFIG_DIR/subscription.json" 0 0 0600 2>/dev/null
 set_perm "$CONFIG_DIR/force_proxy_app.txt" 0 0 0600 2>/dev/null
 set_perm "$CONFIG_DIR/force_bypass_app.txt" 0 0 0600 2>/dev/null

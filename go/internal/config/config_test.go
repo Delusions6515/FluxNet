@@ -18,7 +18,7 @@ func TestApplyRuntimeInjectsAtpAppLists(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "sing-box.config"), []byte("proxy_mode=redirect\napp_proxy_enable=1\napp_proxy_mode=blacklist\nbypass_apps_list=\"com.example.manual\"\n"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "fluxnet.config"), []byte("proxy_mode=redirect\napp_proxy_enable=1\napp_proxy_mode=blacklist\nbypass_apps_list=\"com.example.manual\"\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(layout.InboundTemplate("redirect"), []byte(`{"type":"redirect","tag":"redirect-in"}`), 0600); err != nil {
@@ -69,7 +69,7 @@ func TestTemplateAppProxyUsesConfiguredMode(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "sing-box.config"), []byte("app_proxy_enable=1\napp_proxy_mode=whitelist\nproxy_apps_list=\"com.example.manual com.example.bypass\"\n"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "fluxnet.config"), []byte("app_proxy_enable=1\napp_proxy_mode=whitelist\nproxy_apps_list=\"com.example.manual com.example.bypass\"\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(layout.ForceProxyApps(), []byte("com.example.force\n"), 0600); err != nil {
@@ -80,7 +80,7 @@ func TestTemplateAppProxyUsesConfiguredMode(t *testing.T) {
 	}
 	for mode, template := range map[string]string{
 		"tun":  `{"type":"tun","include_package":["stale"],"exclude_package":["stale"]}`,
-		"ebpf": `{"type":"ebpf","local":{"include_package":["stale"],"exclude_package":["stale"]}}`,
+		"ebpf": `{"type":"ebpf","mode":"local","local":{"include_package":["stale"],"exclude_package":["stale"]}}`,
 	} {
 		if err := os.WriteFile(layout.InboundTemplate(mode), []byte(template), 0600); err != nil {
 			t.Fatal(err)
@@ -94,6 +94,9 @@ func TestTemplateAppProxyUsesConfiguredMode(t *testing.T) {
 			t.Fatal(err)
 		}
 		if mode == "ebpf" {
+			if inbound["mode"] != "local" {
+				t.Errorf("ebpf mode = %v, want template value local", inbound["mode"])
+			}
 			inbound = inbound["local"].(map[string]any)
 		}
 		if _, ok := inbound["exclude_package"]; ok {
@@ -112,7 +115,7 @@ func TestEffectiveAppProxyUsesForceBypassWhenDisabled(t *testing.T) {
 	if err := os.MkdirAll(layout.ConfigDir(), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "sing-box.config"), []byte("app_proxy_enable=0\napp_proxy_mode=whitelist\n"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "fluxnet.config"), []byte("app_proxy_enable=0\napp_proxy_mode=whitelist\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(layout.ForceBypassApps(), []byte("com.example.bypass\n"), 0600); err != nil {

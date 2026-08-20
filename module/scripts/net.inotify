@@ -17,7 +17,7 @@ fi
 # 从配置文件读取代理模式
 mode=$(sed -n 's/^proxy_mode=//p' "$USER_CONFIG_FILE" 2>/dev/null | head -1)
 mode=$(echo "$mode" | tr -d "\"' ")
-mode="${mode:-tproxy}"
+mode="${mode:-tun}"
 
 case "$mode" in
     tproxy|redirect)

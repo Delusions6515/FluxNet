@@ -25,7 +25,7 @@ func TestStartReturnsPromptlyAndLeavesServiceRunning(t *testing.T) {
 	if err := os.MkdirAll(layout.ConfigDir(), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "sing-box.config"), []byte("proxy_mode=tun\n"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "fluxnet.config"), []byte("proxy_mode=tun\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(layout.InboundTemplate("tun"), []byte(`{"type":"tun","tag":"tun-in"}`), 0600); err != nil {

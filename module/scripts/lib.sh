@@ -14,10 +14,10 @@ load_config() {
   CONFIG_DIR="$DATA_DIR/config"
 
   # 用户配置文件优先数据目录，不存在回退模块目录
-  if [ -f "$CONFIG_DIR/sing-box.config" ]; then
-    USER_CONFIG_FILE="$CONFIG_DIR/sing-box.config"
+  if [ -f "$CONFIG_DIR/fluxnet.config" ]; then
+    USER_CONFIG_FILE="$CONFIG_DIR/fluxnet.config"
   else
-    USER_CONFIG_FILE="$MODDIR/config/sing-box.config"
+    USER_CONFIG_FILE="$MODDIR/config/fluxnet.config"
   fi
 
   # shellcheck disable=SC1090
@@ -27,19 +27,19 @@ load_config() {
   }
 
   # 路径导出
-  sing_box_path="${sing_box_path:-$DATA_DIR}"
-  bin_path="${sing_box_path}/bin/sing-box"
-  atp_bin="${sing_box_path}/bin/atp"
+  flux_data="${flux_data:-$DATA_DIR}"
+  bin_path="${sing_box_bin_path:-${flux_data}/bin/sing-box}"
+  atp_bin="${atp_bin_path:-${flux_data}/bin/atp}"
   fluxnet_bin="$MODDIR/bin/fluxnet"
 
-  config_root="${sing_box_path}/config"
+  config_root="${flux_data}/config"
   local_config_path="${config_root}/local"
   remote_config_path="${config_root}/remote"
-  run_path="${sing_box_path}/run"
+  run_path="${flux_data}/run"
   runtime_config_dir="${config_root}/run"
   runtime_config_path="${runtime_config_dir}/config.json"
   runtime_tproxy_dir="${runtime_config_dir}/tproxy"
-  logs_path="${sing_box_path}/logs"
+  logs_path="${flux_data}/logs"
 
   subscription_file="${config_root}/subscription.json"
   inbound_template_path="$MODDIR/config/inbounds/tpl"
@@ -57,11 +57,11 @@ load_config() {
   service_pid_file="${run_path}/sing-box.pid"
   worker_pid_file="${run_path}/worker.pid"
   config_changed_marker="${run_path}/.config-changed"
-  manual_marker="${sing_box_path}/manual"
+  manual_marker="${flux_data}/manual"
 
   # 默认值
   bin_name="${bin_name:-sing-box}"
-  proxy_mode="${proxy_mode:-tproxy}"
+  proxy_mode="${proxy_mode:-tun}"
   kernel_channel="${kernel_channel:-delusions6515-pre}"
   kernel_abi="${kernel_abi:-arm64-v8a}"
   autostart="${autostart:-1}"

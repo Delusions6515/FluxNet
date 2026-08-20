@@ -22,6 +22,10 @@ func NewTemplate(layout *paths.Layout) *Template {
 // Apply reads the inbound template for the given mode, injects app lists and
 // mode-specific fields, and returns the assembled inbound as json.RawMessage.
 func (t *Template) Apply(mode string) (json.RawMessage, error) {
+	if mode != "tun" && mode != "tproxy" && mode != "redirect" && mode != "ebpf" {
+		return nil, fmt.Errorf("不支持的代理模式: %s", mode)
+	}
+
 	tplPath := t.layout.InboundTemplate(mode)
 	data, err := os.ReadFile(tplPath)
 	if err != nil {
@@ -56,7 +60,7 @@ func (t *Template) Apply(mode string) (json.RawMessage, error) {
 func (t *Template) injectTun(inbound map[string]any) {
 	injectAppProxy(inbound, effectiveAppProxy(t.layout))
 
-	// stack from sing-box.config
+	// stack from fluxnet.config
 	cfg := readConfigKV(t.layout.ConfigFile())
 	if stack, ok := cfg["tun_stack"]; ok && stack != "" {
 		inbound["stack"] = stack
@@ -83,12 +87,6 @@ func (t *Template) injectRedirect(inbound map[string]any) {
 }
 
 func (t *Template) injectEbpf(inbound map[string]any) {
-	cfg := readConfigKV(t.layout.ConfigFile())
-
-	if mode, ok := cfg["ebpf_mode"]; ok && mode != "" {
-		inbound["mode"] = mode
-	}
-
 	if local, ok := inbound["local"].(map[string]any); ok {
 		injectAppProxy(local, effectiveAppProxy(t.layout))
 	}
