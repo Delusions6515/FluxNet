@@ -13,6 +13,23 @@ import (
 
 // Apply assembles the runtime sing-box config and applies atp rules if needed.
 func Apply(layout *paths.Layout, formatJSON bool) {
+	mode, err := ApplyRuntime(layout)
+	if err != nil {
+		result.Err(formatJSON, "config.apply_failed", err.Error())
+		return
+	}
+
+	if formatJSON {
+		result.Text(result.Success("config.applied", "配置已应用",
+			map[string]any{"mode": mode}), true)
+	} else {
+		fmt.Printf("✓ 配置已应用 (模式: %s, 入站: %s-in)\n", mode, mode)
+	}
+}
+
+// ApplyRuntime assembles the runtime config and applies mode-specific rules.
+// It returns errors to callers that need to avoid starting with stale config.
+func ApplyRuntime(layout *paths.Layout) (string, error) {
 	kv := readConfigKV(layout.ConfigFile())
 	mode := kv["proxy_mode"]
 	if mode == "" {
@@ -22,56 +39,44 @@ func Apply(layout *paths.Layout, formatJSON bool) {
 	// 1. Load active full config from subscription.json
 	fullConfig, err := loadActiveConfig(layout)
 	if err != nil {
-		result.Err(formatJSON, "config.load_failed", "加载活跃配置失败: "+err.Error())
-		return
+		return "", fmt.Errorf("加载活跃配置失败: %w", err)
 	}
 
 	// 2. Generate inbound from template
 	tmpl := NewTemplate(layout)
 	inbound, err := tmpl.Apply(mode)
 	if err != nil {
-		result.Err(formatJSON, "config.template_failed", "入站模板处理失败: "+err.Error())
-		return
+		return "", fmt.Errorf("入站模板处理失败: %w", err)
 	}
 
 	// 3. Inject inbound into inbounds array
 	if err := injectInbound(&fullConfig, inbound); err != nil {
-		result.Err(formatJSON, "config.inject_failed", "入站注入失败: "+err.Error())
-		return
+		return "", fmt.Errorf("入站注入失败: %w", err)
 	}
 
 	// 4. Write run/config.json
 	runConfigDir := layout.RunConfigDir()
 	if err := os.MkdirAll(runConfigDir, 0755); err != nil {
-		result.Err(formatJSON, "config.write_failed", "创建运行配置目录失败: "+err.Error())
-		return
+		return "", fmt.Errorf("创建运行配置目录失败: %w", err)
 	}
 
 	runData, err := json.MarshalIndent(fullConfig, "", "  ")
 	if err != nil {
-		result.Err(formatJSON, "config.serialize_failed", "序列化运行配置失败: "+err.Error())
-		return
+		return "", fmt.Errorf("序列化运行配置失败: %w", err)
 	}
 
 	if err := os.WriteFile(layout.RunConfigPath(), runData, 0600); err != nil {
-		result.Err(formatJSON, "config.write_failed", "写入运行配置失败: "+err.Error())
-		return
+		return "", fmt.Errorf("写入运行配置失败: %w", err)
 	}
 
 	// 5. atp for tproxy/redirect modes
 	if mode == "tproxy" || mode == "redirect" {
 		if err := applyAtp(layout); err != nil {
-			result.Err(formatJSON, "config.atp_failed", "atp 规则应用失败: "+err.Error())
-			return
+			return "", fmt.Errorf("atp 规则应用失败: %w", err)
 		}
 	}
 
-	if formatJSON {
-		result.Text(result.Success("config.applied", "配置已应用",
-			map[string]any{"mode": mode}), true)
-	} else {
-		fmt.Printf("✓ 配置已应用 (模式: %s, 入站: %s-in)\n", mode, mode)
-	}
+	return mode, nil
 }
 
 // loadActiveConfig reads subscription.json, finds the active entry, and loads

@@ -44,9 +44,8 @@ func Start(layout *paths.Layout, formatJSON bool) {
 		return
 	}
 
-	// Run config apply placeholder (real implementation in Commit 4)
-	if _, err := os.Stat(runConfig); os.IsNotExist(err) {
-		result.Err(formatJSON, "service.no_run_config", "运行配置不存在，请先执行 fluxnet config apply")
+	if _, err := config.ApplyRuntime(layout); err != nil {
+		result.Err(formatJSON, "service.config_apply_failed", "应用运行配置失败: "+err.Error())
 		return
 	}
 

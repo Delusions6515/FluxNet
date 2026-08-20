@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Delusions6515/FluxNet/internal/config"
 	"github.com/Delusions6515/FluxNet/internal/paths"
 	"github.com/Delusions6515/FluxNet/internal/result"
 	"github.com/Delusions6515/FluxNet/internal/service"
@@ -57,7 +56,6 @@ func Stop(layout *paths.Layout, formatJSON bool) {
 func Run(layout *paths.Layout) {
 	// Initial startup
 	if autostartEnabled(layout) {
-		config.Apply(layout, false)
 		service.Start(layout, false)
 	}
 
@@ -100,10 +98,9 @@ func Run(layout *paths.Layout) {
 			checkConfigChange(layout, &lastConfigChange)
 
 		case <-hotTicker.C:
-			// Hot-reload: .config-changed → config apply → restart (debounce 3s)
+			// Hot-reload: .config-changed → restart (debounce 3s)
 			if _, err := os.Stat(layout.ConfigChangedMarker()); err == nil {
 				if time.Since(lastHotReload) > debounceDur {
-					config.Apply(layout, false)
 					service.Restart(layout, false)
 					os.Remove(layout.ConfigChangedMarker())
 					lastHotReload = time.Now()
@@ -113,7 +110,6 @@ func Run(layout *paths.Layout) {
 			// modules_update → wait for swap → restart
 			if _, err := os.Stat(layout.ModulesUpdateDir()); err == nil {
 				time.Sleep(2 * time.Second)
-				config.Apply(layout, false)
 				service.Restart(layout, false)
 			}
 		}
