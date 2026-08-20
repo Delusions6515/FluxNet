@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -195,8 +196,18 @@ func applyAtp(layout *paths.Layout, mode string) error {
 	}
 
 	cmd := exec.Command(atpBin, "-d", tproxyDir, "start")
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
+	if err := os.MkdirAll(layout.LogsDir(), 0755); err == nil {
+		if logFile, err := os.OpenFile(layout.AtpLog(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600); err == nil {
+			defer logFile.Close()
+			output := io.MultiWriter(os.Stderr, logFile)
+			cmd.Stdout = output
+			cmd.Stderr = output
+		}
+	}
+	if cmd.Stdout == nil {
+		cmd.Stdout = os.Stderr
+		cmd.Stderr = os.Stderr
+	}
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("atp start 失败: %w", err)
 	}
@@ -211,18 +222,21 @@ func injectAtpAppSettings(data []byte, apps appProxySettings, mode string) []byt
 	if apps.enabled {
 		enabled = "1"
 	}
-	data = setShellVariable(data, "APP_PROXY_ENABLE", enabled)
-	data = setShellVariable(data, "APP_PROXY_MODE", apps.mode)
-	data = setShellVariable(data, "PROXY_APPS_LIST", strings.Join(apps.proxyApps, " "))
-	data = setShellVariable(data, "BYPASS_APPS_LIST", strings.Join(apps.bypassApps, " "))
+	data = setShellVariable(data, "APP_PROXY_ENABLE", enabled, false)
+	data = setShellVariable(data, "APP_PROXY_MODE", apps.mode, true)
+	data = setShellVariable(data, "PROXY_APPS_LIST", strings.Join(apps.proxyApps, " "), true)
+	data = setShellVariable(data, "BYPASS_APPS_LIST", strings.Join(apps.bypassApps, " "), true)
 	if mode == "redirect" {
-		return setShellVariable(data, "PROXY_MODE", "2")
+		return setShellVariable(data, "PROXY_MODE", "2", false)
 	}
-	return setShellVariable(data, "PROXY_MODE", "1")
+	return setShellVariable(data, "PROXY_MODE", "1", false)
 }
 
-func setShellVariable(data []byte, key, value string) []byte {
-	assignment := fmt.Sprintf("%s=%q", key, value)
+func setShellVariable(data []byte, key, value string, quote bool) []byte {
+	assignment := fmt.Sprintf("%s=%s", key, value)
+	if quote {
+		assignment = fmt.Sprintf("%s=%q", key, value)
+	}
 	lines := strings.Split(string(data), "\n")
 	prefix := key + "="
 	for i, line := range lines {

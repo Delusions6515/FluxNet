@@ -22,8 +22,9 @@ mode="${mode:-tun}"
 case "$mode" in
     tproxy|redirect)
         if [ -f "$atp_bin" ] && [ -d "$runtime_tproxy_dir" ]; then
-            "$atp_bin" -d "$runtime_tproxy_dir" stop >/dev/null 2>&1
-            "$atp_bin" -d "$runtime_tproxy_dir" start >/dev/null 2>&1
+            mkdir -p "$logs_path"
+            "$atp_bin" -d "$runtime_tproxy_dir" stop >>"$logs_path/atp.log" 2>&1
+            "$atp_bin" -d "$runtime_tproxy_dir" start >>"$logs_path/atp.log" 2>&1
         fi
         ;;
 esac

@@ -146,7 +146,7 @@ func removeApps(apps, remove []string) []string {
 	for _, app := range remove {
 		blocked[app] = struct{}{}
 	}
-	var result []string
+	result := make([]string, 0, len(apps))
 	for _, app := range uniqueApps(apps) {
 		if _, ok := blocked[app]; !ok {
 			result = append(result, app)
@@ -157,7 +157,7 @@ func removeApps(apps, remove []string) []string {
 
 func uniqueApps(apps []string) []string {
 	seen := make(map[string]struct{}, len(apps))
-	var result []string
+	result := make([]string, 0, len(apps))
 	for _, app := range apps {
 		if _, ok := seen[app]; !ok {
 			seen[app] = struct{}{}

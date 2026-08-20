@@ -177,6 +177,11 @@ func (l *Layout) LogsDir() string {
 	return filepath.Join(l.DataDir, "logs")
 }
 
+// AtpLog returns the persistent log for AndroidTProxyShell commands.
+func (l *Layout) AtpLog() string {
+	return filepath.Join(l.LogsDir(), "atp.log")
+}
+
 // PrivateDnsStateFile returns the backup file for Android Private DNS mode.
 func (l *Layout) PrivateDnsStateFile() string {
 	return filepath.Join(l.RunDir(), ".private_dns_mode")
