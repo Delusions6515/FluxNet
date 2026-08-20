@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,10 +15,7 @@ import (
 )
 
 const (
-	serviceStartTimeout = 120 * time.Second
-	readyPollInterval   = 500 * time.Millisecond
-	readyPollTimeout    = 30 * time.Second
-	stopGraceTimeout    = 5 * time.Second
+	stopGraceTimeout = 5 * time.Second
 )
 
 // StatusData is returned by the status command.
@@ -65,11 +61,8 @@ func Start(layout *paths.Layout, formatJSON bool) {
 	// Disable Private DNS to prevent DNS leaks
 	savePrivateDns(layout)
 
-	// Start sing-box
-	ctx, cancel := context.WithTimeout(context.Background(), serviceStartTimeout)
-	defer cancel()
-
-	svcCmd := exec.CommandContext(ctx, bin, "run", "-c", runConfig, "-D", layout.RunDir())
+	// Start sing-box without waiting for its long-running process to exit.
+	svcCmd := exec.Command(bin, "run", "-c", runConfig, "-D", layout.RunDir())
 	svcCmd.Stdout = os.Stdout
 	svcCmd.Stderr = os.Stderr
 
@@ -80,14 +73,6 @@ func Start(layout *paths.Layout, formatJSON bool) {
 
 	// Write PID
 	writePID(layout, svcCmd.Process.Pid)
-
-	// Wait for readiness: poll process liveness (API polling can be added later)
-	ready := waitReady(svcCmd.Process.Pid, readyPollTimeout)
-	if !ready {
-		writePID(layout, 0) // clear PID on failure
-		result.Err(formatJSON, "service.start_timeout", "sing-box 启动超时，进程未就绪")
-		return
-	}
 
 	// Read mode from config for output
 	mode := readProxyMode(layout)
@@ -284,21 +269,6 @@ func uptimeTicks() int64 {
 		return 0
 	}
 	return int64(secs * 100) // ticks (100/sec)
-}
-
-func waitReady(pid int, timeout time.Duration) bool {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		cmdlinePath := fmt.Sprintf("/proc/%d/cmdline", pid)
-		_, err := os.ReadFile(cmdlinePath)
-		if err == nil {
-			time.Sleep(readyPollInterval)
-			continue
-		}
-		// Process exited — not ready
-		return false
-	}
-	return true
 }
 
 func readProxyMode(layout *paths.Layout) string {
