@@ -139,7 +139,7 @@ func minimalConfig() map[string]any {
 		},
 		"dns": map[string]any{
 			"servers": []map[string]any{
-				{"tag": "dns-local", "address": "223.5.5.5", "detour": "direct"},
+				{"tag": "local", "type": "udp", "server": "223.5.5.5"},
 			},
 		},
 		"inbounds":  []any{},
