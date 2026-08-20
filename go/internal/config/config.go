@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/Delusions6515/FluxNet/internal/paths"
 	"github.com/Delusions6515/FluxNet/internal/result"
@@ -71,7 +72,7 @@ func ApplyRuntime(layout *paths.Layout) (string, error) {
 
 	// 5. atp for tproxy/redirect modes
 	if mode == "tproxy" || mode == "redirect" {
-		if err := applyAtp(layout); err != nil {
+		if err := applyAtp(layout, mode); err != nil {
 			return "", fmt.Errorf("atp 规则应用失败: %w", err)
 		}
 	}
@@ -166,13 +167,14 @@ func injectInbound(config *map[string]any, inbound json.RawMessage) error {
 }
 
 // applyAtp generates the atp runtime config and calls atp start.
-func applyAtp(layout *paths.Layout) error {
+func applyAtp(layout *paths.Layout, mode string) error {
 	// Read tproxy.conf template
 	tproxyConfPath := layout.TproxyConf()
 	tproxyData, err := os.ReadFile(tproxyConfPath)
 	if err != nil {
 		return fmt.Errorf("读取 tproxy.conf 失败: %w", err)
 	}
+	tproxyData = injectAtpAppSettings(tproxyData, effectiveAppProxy(layout), mode)
 
 	// Write runtime tproxy config
 	tproxyDir := layout.RunTproxyDir()
@@ -197,4 +199,41 @@ func applyAtp(layout *paths.Layout) error {
 	}
 
 	return nil
+}
+
+// injectAtpAppSettings synchronizes FluxNet's effective app filtering with
+// atp's shell configuration.
+func injectAtpAppSettings(data []byte, apps appProxySettings, mode string) []byte {
+	enabled := "0"
+	if apps.enabled {
+		enabled = "1"
+	}
+	data = setShellVariable(data, "APP_PROXY_ENABLE", enabled)
+	data = setShellVariable(data, "APP_PROXY_MODE", apps.mode)
+	data = setShellVariable(data, "PROXY_APPS_LIST", strings.Join(apps.proxyApps, " "))
+	data = setShellVariable(data, "BYPASS_APPS_LIST", strings.Join(apps.bypassApps, " "))
+	if mode == "redirect" {
+		return setShellVariable(data, "PROXY_MODE", "2")
+	}
+	return setShellVariable(data, "PROXY_MODE", "1")
+}
+
+func setShellVariable(data []byte, key, value string) []byte {
+	assignment := fmt.Sprintf("%s=%q", key, value)
+	lines := strings.Split(string(data), "\n")
+	prefix := key + "="
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, prefix) {
+			lines[i] = line[:len(line)-len(strings.TrimLeft(line, " \t"))] + assignment
+			return []byte(strings.Join(lines, "\n"))
+		}
+	}
+
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = append(lines[:len(lines)-1], assignment, "")
+	} else {
+		lines = append(lines, assignment)
+	}
+	return []byte(strings.Join(lines, "\n"))
 }

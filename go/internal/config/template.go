@@ -54,16 +54,7 @@ func (t *Template) Apply(mode string) (json.RawMessage, error) {
 // ---- mode-specific injection ----
 
 func (t *Template) injectTun(inbound map[string]any) {
-	// Inject include_package / exclude_package from app lists
-	proxyApps := readAppList(t.layout.ForceProxyApps())
-	bypassApps := readAppList(t.layout.ForceBypassApps())
-
-	if len(proxyApps) > 0 {
-		inbound["include_package"] = proxyApps
-	}
-	if len(bypassApps) > 0 {
-		inbound["exclude_package"] = bypassApps
-	}
+	injectAppProxy(inbound, effectiveAppProxy(t.layout))
 
 	// stack from sing-box.config
 	cfg := readConfigKV(t.layout.ConfigFile())
@@ -98,17 +89,84 @@ func (t *Template) injectEbpf(inbound map[string]any) {
 		inbound["mode"] = mode
 	}
 
-	proxyApps := readAppList(t.layout.ForceProxyApps())
-	bypassApps := readAppList(t.layout.ForceBypassApps())
-
 	if local, ok := inbound["local"].(map[string]any); ok {
-		if len(proxyApps) > 0 {
-			local["include_package"] = proxyApps
-		}
-		if len(bypassApps) > 0 {
-			local["exclude_package"] = bypassApps
+		injectAppProxy(local, effectiveAppProxy(t.layout))
+	}
+}
+
+type appProxySettings struct {
+	enabled    bool
+	mode       string
+	proxyApps  []string
+	bypassApps []string
+}
+
+func effectiveAppProxy(layout *paths.Layout) appProxySettings {
+	cfg := readConfigKV(layout.ConfigFile())
+	mode := cfg["app_proxy_mode"]
+	if mode != "whitelist" && mode != "blacklist" {
+		mode = "blacklist"
+	}
+
+	forceProxy := readAppList(layout.ForceProxyApps())
+	forceBypass := readAppList(layout.ForceBypassApps())
+	if cfg["app_proxy_enable"] != "1" && len(forceProxy) == 0 && len(forceBypass) == 0 {
+		return appProxySettings{mode: mode}
+	}
+	if cfg["app_proxy_enable"] != "1" {
+		mode = "blacklist"
+	}
+
+	settings := appProxySettings{enabled: true, mode: mode}
+	if mode == "whitelist" {
+		settings.proxyApps = removeApps(append(parseAppList(cfg["proxy_apps_list"]), forceProxy...), forceBypass)
+	} else {
+		settings.bypassApps = removeApps(append(parseAppList(cfg["bypass_apps_list"]), forceBypass...), forceProxy)
+	}
+	return settings
+}
+
+func injectAppProxy(inbound map[string]any, apps appProxySettings) {
+	delete(inbound, "include_package")
+	delete(inbound, "exclude_package")
+	if !apps.enabled {
+		return
+	}
+	if apps.mode == "whitelist" {
+		inbound["include_package"] = apps.proxyApps
+		return
+	}
+	inbound["exclude_package"] = apps.bypassApps
+}
+
+func parseAppList(value string) []string {
+	return uniqueApps(strings.Fields(value))
+}
+
+func removeApps(apps, remove []string) []string {
+	blocked := make(map[string]struct{}, len(remove))
+	for _, app := range remove {
+		blocked[app] = struct{}{}
+	}
+	var result []string
+	for _, app := range uniqueApps(apps) {
+		if _, ok := blocked[app]; !ok {
+			result = append(result, app)
 		}
 	}
+	return result
+}
+
+func uniqueApps(apps []string) []string {
+	seen := make(map[string]struct{}, len(apps))
+	var result []string
+	for _, app := range apps {
+		if _, ok := seen[app]; !ok {
+			seen[app] = struct{}{}
+			result = append(result, app)
+		}
+	}
+	return result
 }
 
 // ---- helpers ----
