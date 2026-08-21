@@ -7,8 +7,13 @@ export const MODULE_VERSION = info.version || ''
 const script = `${info.moduleDir || '/data/adb/modules/fluxnet'}/scripts/webui.sh`
 
 export function requestEdgeToEdge() { if (!isBrowserDev) { try { enableEdgeToEdge(true) } catch {} } }
-function encode(value) { return btoa(String.fromCharCode(...new TextEncoder().encode(value))) }
-function quote(value) { return `'${String(value).replaceAll("'", "'\\\"'\\\"'")}'` }
+function encode(value) {
+  const bytes = new TextEncoder().encode(value)
+  let binary = ''
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000))
+  return btoa(binary)
+}
+function quote(value) { return `'${String(value).replaceAll("'", "'\"'\"'")}'` }
 
 async function gateway(command, args = []) {
   let raw
@@ -19,6 +24,7 @@ async function gateway(command, args = []) {
     raw = output.stdout
   }
   const response = JSON.parse(raw)
+  if (response.schema !== 1) throw new Error('模块响应版本不受支持')
   if (!response.ok) throw new Error(response.message || response.code || '模块操作失败')
   return response.data
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Delusions6515/FluxNet/internal/paths"
@@ -68,45 +69,89 @@ func ReplaceAppList(layout *paths.Layout, mode string, apps []string) (Settings,
 	if mode == "blacklist" {
 		key = "bypass_apps_list"
 	}
-	if err := writeConfigValue(layout.ConfigFile(), "app_proxy_enable", "1", false); err != nil {
-		return Settings{}, err
-	}
-	if err := writeConfigValue(layout.ConfigFile(), "app_proxy_mode", mode, true); err != nil {
-		return Settings{}, err
-	}
-	if err := writeConfigValue(layout.ConfigFile(), key, strings.Join(clean, " "), true); err != nil {
+	if err := writeConfigValues(layout.ConfigFile(), map[string]configValue{
+		"app_proxy_mode": {value: mode, quote: true},
+		key:              {value: strings.Join(clean, " "), quote: true},
+	}); err != nil {
 		return Settings{}, err
 	}
 	return ReadSettings(layout), nil
 }
 
+type configValue struct {
+	value string
+	quote bool
+}
+
 func writeConfigValue(file, key, value string, quote bool) error {
+	return writeConfigValues(file, map[string]configValue{key: {value: value, quote: quote}})
+}
+
+func writeConfigValues(file string, updates map[string]configValue) error {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return err
 	}
-	assignment := key + "=" + value
-	if quote {
-		assignment = fmt.Sprintf("%s=%q", key, value)
-	}
 	lines := strings.Split(string(data), "\n")
-	found := false
+	found := make(map[string]bool, len(updates))
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, "#") && strings.HasPrefix(trimmed, key+"=") {
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		key, _, ok := strings.Cut(trimmed, "=")
+		if !ok {
+			continue
+		}
+		if update, ok := updates[key]; ok {
+			assignment := key + "=" + update.value
+			if update.quote {
+				assignment = fmt.Sprintf("%s=%q", key, update.value)
+			}
 			lines[i] = assignment
-			found = true
-			break
+			found[key] = true
 		}
 	}
-	if !found {
+	for key, update := range updates {
+		if found[key] {
+			continue
+		}
+		assignment := key + "=" + update.value
+		if update.quote {
+			assignment = fmt.Sprintf("%s=%q", key, update.value)
+		}
 		if len(lines) > 0 && lines[len(lines)-1] == "" {
 			lines = append(lines[:len(lines)-1], assignment, "")
 		} else {
 			lines = append(lines, assignment)
 		}
 	}
-	return os.WriteFile(file, []byte(strings.Join(lines, "\n")), 0600)
+	return atomicWriteFile(file, []byte(strings.Join(lines, "\n")), 0600)
+}
+
+func atomicWriteFile(file string, data []byte, mode os.FileMode) error {
+	temp, err := os.CreateTemp(filepath.Dir(file), ".fluxnet-*")
+	if err != nil {
+		return err
+	}
+	tempName := temp.Name()
+	defer os.Remove(tempName)
+	if err := temp.Chmod(mode); err != nil {
+		temp.Close()
+		return err
+	}
+	if _, err := temp.Write(data); err != nil {
+		temp.Close()
+		return err
+	}
+	if err := temp.Sync(); err != nil {
+		temp.Close()
+		return err
+	}
+	if err := temp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tempName, file)
 }
 
 func validPackageName(name string) bool {

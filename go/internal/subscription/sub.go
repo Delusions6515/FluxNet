@@ -78,7 +78,7 @@ func Add(layout *paths.Layout, formatJSON bool, urlOrPath, name string) {
 			result.Err(formatJSON, "subscription.write_failed", "创建目录失败: "+err.Error())
 			return
 		}
-		if err := os.WriteFile(dest, data, 0600); err != nil {
+		if err := atomicWriteFile(dest, data, 0600); err != nil {
 			result.Err(formatJSON, "subscription.write_failed", "写入配置失败: "+err.Error())
 			return
 		}
@@ -94,7 +94,7 @@ func Add(layout *paths.Layout, formatJSON bool, urlOrPath, name string) {
 			result.Err(formatJSON, "subscription.write_failed", "创建目录失败: "+err.Error())
 			return
 		}
-		if err := os.WriteFile(dest, srcData, 0600); err != nil {
+		if err := atomicWriteFile(dest, srcData, 0600); err != nil {
 			result.Err(formatJSON, "subscription.write_failed", "写入配置失败: "+err.Error())
 			return
 		}
@@ -137,7 +137,7 @@ func CreateLocal(layout *paths.Layout, formatJSON bool, name string) {
 	}
 	content := []byte("{\n  \"log\": { \"level\": \"info\" },\n  \"inbounds\": [],\n  \"outbounds\": [{ \"type\": \"direct\", \"tag\": \"direct\" }],\n  \"route\": { \"rules\": [], \"final\": \"direct\" }\n}\n")
 	filename := name + ".json"
-	if err := os.WriteFile(filepath.Join(layout.LocalConfigDir(), filename), content, 0600); err != nil {
+	if err := atomicWriteFile(filepath.Join(layout.LocalConfigDir(), filename), content, 0600); err != nil {
 		result.Err(formatJSON, "subscription.write_failed", "写入配置失败: "+err.Error())
 		return
 	}
@@ -193,7 +193,7 @@ func WriteLocal(layout *paths.Layout, formatJSON bool, name, encoded string) {
 		result.Err(formatJSON, "subscription.invalid_json", "订阅必须是 JSON 对象")
 		return
 	}
-	if err := os.WriteFile(filepath.Join(layout.LocalConfigDir(), sub.Filename), data, 0600); err != nil {
+	if err := atomicWriteFile(filepath.Join(layout.LocalConfigDir(), sub.Filename), data, 0600); err != nil {
 		result.Err(formatJSON, "subscription.write_failed", "写入本地订阅失败: "+err.Error())
 		return
 	}
@@ -393,7 +393,32 @@ func saveIndex(layout *paths.Layout, idx *Index) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(layout.SubscriptionFile(), data, 0600)
+	return atomicWriteFile(layout.SubscriptionFile(), data, 0600)
+}
+
+func atomicWriteFile(file string, data []byte, mode os.FileMode) error {
+	temp, err := os.CreateTemp(filepath.Dir(file), ".fluxnet-*")
+	if err != nil {
+		return err
+	}
+	tempName := temp.Name()
+	defer os.Remove(tempName)
+	if err := temp.Chmod(mode); err != nil {
+		temp.Close()
+		return err
+	}
+	if _, err := temp.Write(data); err != nil {
+		temp.Close()
+		return err
+	}
+	if err := temp.Sync(); err != nil {
+		temp.Close()
+		return err
+	}
+	if err := temp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tempName, file)
 }
 
 func find(idx *Index, name string) (Subscription, bool) {
