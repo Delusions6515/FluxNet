@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Delusions6515/FluxNet/internal/config"
+	"github.com/Delusions6515/FluxNet/internal/logs"
 	"github.com/Delusions6515/FluxNet/internal/paths"
 	"github.com/Delusions6515/FluxNet/internal/result"
 )
@@ -61,6 +62,10 @@ func start(layout *paths.Layout, formatJSON bool) {
 		result.Err(formatJSON, "service.check_failed", fmt.Sprintf("sing-box check 未通过: %s", strings.TrimSpace(string(checkOut))))
 		return
 	}
+
+	// Rotate logs so this run starts fresh; old content is kept as .bak.
+	logs.Rotate(layout.OperationLog())
+	logs.Rotate(layout.AtpLog())
 
 	// Disable Private DNS to prevent DNS leaks
 	savePrivateDns(layout)
