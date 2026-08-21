@@ -17,6 +17,7 @@ on:
       - 'build.sh'
       - 'go/**'
       - 'module/**'
+      - 'webui/**'
       - '.github/workflows/*.yml'
 
 permissions:

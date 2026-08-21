@@ -20,6 +20,7 @@ set -euo pipefail
 REPO_DIR=$(cd "$(dirname "$0")" && pwd)
 MODULE_DIR="$REPO_DIR/module"
 GO_DIR="$REPO_DIR/go"
+WEBUI_DIR="$REPO_DIR/webui"
 OUT_DIR="${OUT_DIR:-$REPO_DIR/build}"
 TARGET_ABI="${TARGET_ABI:-arm64-v8a}"
 KERNEL_CHANNEL="${KERNEL_CHANNEL:-delusions6515-pre}"
@@ -50,6 +51,13 @@ case "$TARGET_ABI" in
   *) die "不支持的 TARGET_ABI: $TARGET_ABI" ;;
 esac
 info "目标: $TARGET_ABI (sing-box: $SINGBOX_ARCH, go: $GOARCH${GOARM:+ ARMv$GOARM})  渠道: $KERNEL_CHANNEL"
+
+# ---------- 0. 构建模块 WebUI ----------
+VITE_BIN="$WEBUI_DIR/node_modules/.bin/vite"
+[ -x "$VITE_BIN" ] || die "WebUI 依赖未安装，请先执行 pnpm --dir webui install --frozen-lockfile"
+info "构建 WebUI ..."
+(cd "$WEBUI_DIR" && "$VITE_BIN" build)
+[ -f "$WEBUI_DIR/dist/index.html" ] || die "WebUI 构建未生成 index.html"
 
 # ---------- 渠道 -> 仓库 ----------
 case "$KERNEL_CHANNEL" in
@@ -112,6 +120,9 @@ trap 'rm -rf "$STAGE"' EXIT
 cp -r "$MODULE_DIR/." "$STAGE/"
 find "$STAGE" -name .DS_Store -delete
 STAGE_BIN="$STAGE/bin"
+mkdir -p "$STAGE/webroot"
+cp -r "$WEBUI_DIR/dist/." "$STAGE/webroot/"
+[ -f "$STAGE/webroot/index.html" ] || die "暂存 WebUI 缺少 index.html"
 
 # ---------- 3. 获取 sing-box (带版本缓存) ----------
 KERNEL_BIN="$BIN_DIR/sing-box"

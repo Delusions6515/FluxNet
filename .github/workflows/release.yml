@@ -52,9 +52,9 @@ jobs:
             echo
             prev_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
             if [ -n "$prev_tag" ]; then
-              git log --oneline "$prev_tag..HEAD" -- go/ module/ build.sh
+              git log --oneline "$prev_tag..HEAD" -- go/ module/ webui/ build.sh
             else
-              git log --oneline -- go/ module/ build.sh | head -30
+              git log --oneline -- go/ module/ webui/ build.sh | head -30
             fi
             echo
             echo "[Build run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
