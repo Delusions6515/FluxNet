@@ -3,16 +3,16 @@ import { computed, onActivated, onMounted, ref } from 'vue'
 import { MiuixButton, MiuixCard, MiuixDropdownPreference, MiuixInput, MiuixSmallTitle, MiuixSwitchPreference, MiuixText, showSnackbar } from 'miuix-vue'
 import { getInstalledApps, getSettings, replaceAppList, setSetting } from '@/api/module'
 
-const settings = ref(null); const apps = ref([]); const query = ref(''); const selected = ref([]); const error = ref(''); const saving = ref(false)
+const settings = ref(null); const apps = ref([]); const query = ref(''); const selected = ref([]); const pinned = ref([]); const error = ref(''); const saving = ref(false)
 const modes = ['tun', 'tproxy', 'redirect', 'ebpf']; const appModes = ['blacklist', 'whitelist']
 const modeIndex = computed({ get: () => Math.max(0, modes.indexOf(settings.value?.proxy_mode)), set: (value) => saveSetting('proxy_mode', modes[value]) })
 const appModeIndex = computed({ get: () => Math.max(0, appModes.indexOf(settings.value?.app_proxy_mode)), set: (value) => saveSetting('app_proxy_mode', appModes[value]) })
-const visibleApps = computed(() => apps.value.filter((app) => `${app.appLabel} ${app.packageName}`.toLowerCase().includes(query.value.toLowerCase())))
+const visibleApps = computed(() => apps.value.filter((app) => `${app.appLabel} ${app.packageName}`.toLowerCase().includes(query.value.toLowerCase())).sort((a, b) => Number(pinned.value.includes(b.packageName)) - Number(pinned.value.includes(a.packageName))))
 function showError(err) { showSnackbar({ message: err.message || '操作失败', withDismissAction: true }) }
-async function load() { try { settings.value = await getSettings(); selected.value = [...(settings.value.app_proxy_mode === 'whitelist' ? settings.value.proxy_apps : settings.value.bypass_apps)]; apps.value = await getInstalledApps() } catch (err) { error.value = err.message; showError(err) } }
-async function saveSetting(key, value) { try { settings.value = await setSetting(key, value); if (key === 'app_proxy_mode') selected.value = [...(value === 'whitelist' ? settings.value.proxy_apps : settings.value.bypass_apps)]; showSnackbar({ message: '设置已保存，等待手动应用配置', withDismissAction: true }) } catch (err) { error.value = err.message; showError(err) } }
+async function load() { try { settings.value = await getSettings(); selected.value = [...(settings.value.app_proxy_mode === 'whitelist' ? settings.value.proxy_apps : settings.value.bypass_apps)]; pinned.value = [...selected.value]; apps.value = await getInstalledApps() } catch (err) { error.value = err.message; showError(err) } }
+async function saveSetting(key, value) { try { settings.value = await setSetting(key, value); if (key === 'app_proxy_mode') { selected.value = [...(value === 'whitelist' ? settings.value.proxy_apps : settings.value.bypass_apps)]; pinned.value = [...selected.value] } showSnackbar({ message: '设置已保存，等待手动应用配置', withDismissAction: true }) } catch (err) { error.value = err.message; showError(err) } }
 function toggle(packageName) { selected.value = selected.value.includes(packageName) ? selected.value.filter((item) => item !== packageName) : [...selected.value, packageName] }
-async function saveApps() { saving.value = true; try { settings.value = await replaceAppList(settings.value.app_proxy_mode, selected.value); showSnackbar({ message: '应用名单已保存，等待手动应用配置', withDismissAction: true }) } catch (err) { error.value = err.message; showError(err) } finally { saving.value = false } }
+async function saveApps() { saving.value = true; try { settings.value = await replaceAppList(settings.value.app_proxy_mode, selected.value); pinned.value = [...selected.value]; showSnackbar({ message: '应用名单已保存，等待手动应用配置', withDismissAction: true }) } catch (err) { error.value = err.message; showError(err) } finally { saving.value = false } }
 onMounted(load); onActivated(load)
 </script>
 
