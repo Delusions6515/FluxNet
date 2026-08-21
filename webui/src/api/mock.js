@@ -26,7 +26,7 @@ export function mockGateway(command, args = []) {
       if (args[0] === 'proxy_mode') { state.service.mode = args[1]; state.health.mode = args[1] }
       return result('config.updated', '设置已保存', state.settings)
     case 'app-list-replace':
-      state.settings.app_proxy_enable = true; state.settings.app_proxy_mode = args[0]
+      state.settings.app_proxy_mode = args[0]
       state.settings[args[0] === 'whitelist' ? 'proxy_apps' : 'bypass_apps'] = JSON.parse(atob(args[1]))
       return result('app.replaced', '应用名单已保存', state.settings)
     case 'local-create': {

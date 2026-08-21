@@ -17,15 +17,16 @@ const error = ref('')
 const { theme } = useTheme()
 const extensions = computed(() => [json(), EditorView.lineWrapping, ...(theme.value === 'dark' ? [oneDark] : [])])
 const dirty = computed(() => content.value !== original.value)
+function showError(err) { showSnackbar({ message: err.message || '操作失败', withDismissAction: true }) }
 
 async function load() {
   loading.value = true; error.value = ''
-  try { const data = await readLocalSubscription(props.name); content.value = data.content; original.value = data.content } catch (err) { error.value = err.message } finally { loading.value = false }
+  try { const data = await readLocalSubscription(props.name); content.value = data.content; original.value = data.content } catch (err) { error.value = err.message; showError(err) } finally { loading.value = false }
 }
 async function save() {
   try { JSON.parse(content.value) } catch (err) { error.value = `JSON 格式无效: ${err.message}`; return }
   saving.value = true; error.value = ''
-  try { await writeLocalSubscription(props.name, content.value); original.value = content.value; showSnackbar({ message: '本地订阅已保存', withDismissAction: true }); emit('saved') } catch (err) { error.value = err.message } finally { saving.value = false }
+  try { await writeLocalSubscription(props.name, content.value); original.value = content.value; showSnackbar({ message: '本地订阅已保存', withDismissAction: true }); emit('saved') } catch (err) { error.value = err.message; showError(err) } finally { saving.value = false }
 }
 onMounted(load)
 </script>

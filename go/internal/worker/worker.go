@@ -16,9 +16,8 @@ import (
 )
 
 const (
-	configPollInterval = 3 * time.Second
+	modulePollInterval = 3 * time.Second
 	hotReloadInterval  = 1 * time.Second
-	debounceDur        = 3 * time.Second
 )
 
 // Start launches the background worker process.
@@ -70,11 +69,10 @@ func Run(layout *paths.Layout) {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
 
-	var lastConfigChange time.Time
-	var lastHotReload time.Time
-
-	// Config polling: detect changes to fluxnet.config / tproxy.conf
-	cfgTicker := time.NewTicker(configPollInterval)
+	// Saved settings remain pending until the user explicitly applies and
+	// restarts. Remove markers from older versions to avoid surprise reloads.
+	_ = os.Remove(layout.ConfigChangedMarker())
+	cfgTicker := time.NewTicker(modulePollInterval)
 	defer cfgTicker.Stop()
 
 	hotTicker := time.NewTicker(hotReloadInterval)
@@ -94,19 +92,7 @@ func Run(layout *paths.Layout) {
 				service.Stop(layout, false)
 			}
 
-			// Config change → write .config-changed marker
-			checkConfigChange(layout, &lastConfigChange)
-
 		case <-hotTicker.C:
-			// Hot-reload: .config-changed → restart (debounce 3s)
-			if _, err := os.Stat(layout.ConfigChangedMarker()); err == nil {
-				if time.Since(lastHotReload) > debounceDur {
-					service.Restart(layout, false)
-					os.Remove(layout.ConfigChangedMarker())
-					lastHotReload = time.Now()
-				}
-			}
-
 			// modules_update → wait for swap → restart
 			if _, err := os.Stat(layout.ModulesUpdateDir()); err == nil {
 				time.Sleep(2 * time.Second)
@@ -133,24 +119,6 @@ func startInotifyNet(layout *paths.Layout) {
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	_ = cmd.Start()
-}
-
-// ---- config change detection (Go polling) ----
-
-func checkConfigChange(layout *paths.Layout, last *time.Time) {
-	paths := []string{layout.ConfigFile(), layout.TproxyConf()}
-	for _, p := range paths {
-		fi, err := os.Stat(p)
-		if err != nil {
-			continue
-		}
-		if fi.ModTime().After(*last) {
-			if time.Since(*last) > debounceDur {
-				*last = fi.ModTime()
-				os.WriteFile(layout.ConfigChangedMarker(), []byte("1"), 0644)
-			}
-		}
-	}
 }
 
 // ---- helpers ----

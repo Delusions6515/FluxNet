@@ -6,9 +6,10 @@ import { addRemoteSubscription, createLocalSubscription, getSubscriptions, remov
 const JsonEditor = defineAsyncComponent(() => import('@/components/JsonEditor.vue'))
 const index = ref({ active: '', subscriptions: [] }); const error = ref(''); const busy = ref(''); const editorName = ref(''); const dialog = ref(''); const name = ref(''); const url = ref('')
 const active = computed(() => index.value.active)
-async function load() { try { index.value = await getSubscriptions() } catch (err) { error.value = err.message } }
-async function action(kind, item) { busy.value = `${kind}:${item.name}`; error.value = ''; try { if (kind === 'switch') await switchSubscription(item.name); if (kind === 'update') await updateSubscription(item.name); if (kind === 'remove') await removeSubscription(item.name); await load(); showSnackbar({ message: '订阅已更新，等待手动应用配置', withDismissAction: true }) } catch (err) { error.value = err.message } finally { busy.value = '' } }
-async function create() { try { if (dialog.value === 'local') { await createLocalSubscription(name.value); editorName.value = name.value } else await addRemoteSubscription(name.value, url.value); dialog.value = ''; name.value = ''; url.value = ''; await load() } catch (err) { error.value = err.message } }
+function showError(err) { showSnackbar({ message: err.message || '操作失败', withDismissAction: true }) }
+async function load() { try { index.value = await getSubscriptions() } catch (err) { error.value = err.message; showError(err) } }
+async function action(kind, item) { busy.value = `${kind}:${item.name}`; error.value = ''; try { if (kind === 'switch') await switchSubscription(item.name); if (kind === 'update') await updateSubscription(item.name); if (kind === 'remove') await removeSubscription(item.name); await load(); showSnackbar({ message: '订阅已更新，等待手动应用配置', withDismissAction: true }) } catch (err) { error.value = err.message; showError(err) } finally { busy.value = '' } }
+async function create() { try { if (dialog.value === 'local') { await createLocalSubscription(name.value); editorName.value = name.value } else await addRemoteSubscription(name.value, url.value); dialog.value = ''; name.value = ''; url.value = ''; await load() } catch (err) { error.value = err.message; showError(err) } }
 onMounted(load); onActivated(load)
 </script>
 

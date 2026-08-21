@@ -29,6 +29,17 @@ type StatusData struct {
 
 // Start launches sing-box with the runtime config.
 func Start(layout *paths.Layout, formatJSON bool) {
+	start(layout, formatJSON, true)
+}
+
+// RestartExisting restarts the generated runtime configuration without applying
+// saved edits. This keeps ordinary WebUI restart separate from apply-and-restart.
+func RestartExisting(layout *paths.Layout, formatJSON bool) {
+	restartProcess(layout, false)
+	start(layout, formatJSON, false)
+}
+
+func start(layout *paths.Layout, formatJSON, applyConfig bool) {
 	bin := layout.SingBoxBin()
 	runConfig := layout.RunConfigPath()
 
@@ -44,8 +55,13 @@ func Start(layout *paths.Layout, formatJSON bool) {
 		return
 	}
 
-	if _, err := config.ApplyRuntime(layout); err != nil {
-		result.Err(formatJSON, "service.config_apply_failed", "应用运行配置失败: "+err.Error())
+	if applyConfig {
+		if _, err := config.ApplyRuntime(layout); err != nil {
+			result.Err(formatJSON, "service.config_apply_failed", "应用运行配置失败: "+err.Error())
+			return
+		}
+	} else if _, err := os.Stat(runConfig); err != nil {
+		result.Err(formatJSON, "service.runtime_config_missing", "运行配置不存在，请先应用配置")
 		return
 	}
 
@@ -151,7 +167,11 @@ func Stop(layout *paths.Layout, formatJSON bool) {
 
 // Restart performs stop then start.
 func Restart(layout *paths.Layout, formatJSON bool) {
-	// Stop silently, then start
+	restartProcess(layout, true)
+	Start(layout, formatJSON)
+}
+
+func restartProcess(layout *paths.Layout, cleanRules bool) {
 	bin := layout.SingBoxBin()
 	pid := readPID(layout)
 	if pid > 0 && processAlive(pid, bin) {
@@ -164,12 +184,10 @@ func Restart(layout *paths.Layout, formatJSON bool) {
 		}
 		os.Remove(layout.PidFile())
 
-		mode := readProxyMode(layout)
-		if mode == "tproxy" || mode == "redirect" {
-			cleanupAtp(layout)
-		}
 	}
-	Start(layout, formatJSON)
+	if cleanRules {
+		cleanupAtp(layout)
+	}
 }
 
 // Status reports the current service state.

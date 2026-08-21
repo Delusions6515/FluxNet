@@ -6,8 +6,9 @@ import { applyAndRestart, getOverview, serviceAction } from '@/api/module'
 
 const data = ref(null); const loading = ref(false); const busy = ref(''); const error = ref('')
 const status = computed(() => data.value?.service)
-async function refresh() { loading.value = true; error.value = ''; try { data.value = await getOverview() } catch (err) { error.value = err.message } finally { loading.value = false } }
-async function run(action) { busy.value = action; try { await (action === 'apply' ? applyAndRestart() : serviceAction(action)); showSnackbar({ message: action === 'apply' ? '配置已应用并重启' : '服务操作完成', withDismissAction: true }); await refresh() } catch (err) { error.value = err.message } finally { busy.value = '' } }
+function showError(err) { showSnackbar({ message: err.message || '操作失败', withDismissAction: true }) }
+async function refresh() { loading.value = true; error.value = ''; try { data.value = await getOverview() } catch (err) { error.value = err.message; showError(err) } finally { loading.value = false } }
+async function run(action) { busy.value = action; try { await (action === 'apply' ? applyAndRestart() : serviceAction(action)); showSnackbar({ message: action === 'apply' ? '配置已应用并重启' : '服务操作完成', withDismissAction: true }); await refresh() } catch (err) { error.value = err.message; showError(err) } finally { busy.value = '' } }
 onMounted(refresh); onActivated(refresh)
 </script>
 
