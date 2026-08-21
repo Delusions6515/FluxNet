@@ -13,5 +13,5 @@ onMounted(load); onActivated(load)
 </script>
 
 <template>
-  <div class="page"><MiuixSmallTitle text="外观" /><MiuixCard class="section section--compact"><MiuixDropdownPreference v-model="themeIndex" title="主题" :items="['跟随系统', '浅色', '深色']" /></MiuixCard><MiuixSmallTitle text="启动" /><MiuixCard class="section section--compact"><MiuixSwitchPreference v-if="settings" :model-value="settings.autostart" title="开机自启" summary="下次开机自动启动 FluxNet" @update:model-value="toggleAutostart" /></MiuixCard><MiuixText v-if="error" class="section error" type="body2">{{ error }}</MiuixText></div>
+  <div class="page"><MiuixSmallTitle text="外观" /><MiuixCard class="section section--compact"><MiuixDropdownPreference v-model="themeIndex" title="主题" :items="['跟随系统', '浅色', '深色']" /></MiuixCard><MiuixSmallTitle text="启动" /><MiuixCard class="section section--compact"><MiuixSwitchPreference v-if="settings" :model-value="settings.autostart" title="开机自启" summary="下次开机自动启动 FluxNet" @update:model-value="toggleAutostart" /></MiuixCard><MiuixSmallTitle text="构建信息" /><MiuixCard class="section"><MiuixText type="body2">内核渠道与 ABI 由安装包构建时确定，WebUI 不提供运行时修改。</MiuixText></MiuixCard><MiuixText v-if="error" class="section error" type="body2">{{ error }}</MiuixText></div>
 </template>
