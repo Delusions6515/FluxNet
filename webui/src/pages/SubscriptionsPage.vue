@@ -1,0 +1,27 @@
+<script setup>
+import { computed, defineAsyncComponent, onActivated, onMounted, ref } from 'vue'
+import { MiuixButton, MiuixCard, MiuixDialog, MiuixInput, MiuixSmallTitle, MiuixText, showSnackbar } from 'miuix-vue'
+import { addRemoteSubscription, createLocalSubscription, getSubscriptions, removeSubscription, switchSubscription, updateSubscription } from '@/api/module'
+
+const JsonEditor = defineAsyncComponent(() => import('@/components/JsonEditor.vue'))
+const index = ref({ active: '', subscriptions: [] }); const error = ref(''); const busy = ref(''); const editorName = ref(''); const dialog = ref(''); const name = ref(''); const url = ref('')
+const active = computed(() => index.value.active)
+async function load() { try { index.value = await getSubscriptions() } catch (err) { error.value = err.message } }
+async function action(kind, item) { busy.value = `${kind}:${item.name}`; error.value = ''; try { if (kind === 'switch') await switchSubscription(item.name); if (kind === 'update') await updateSubscription(item.name); if (kind === 'remove') await removeSubscription(item.name); await load(); showSnackbar({ message: '订阅已更新，等待手动应用配置', withDismissAction: true }) } catch (err) { error.value = err.message } finally { busy.value = '' } }
+async function create() { try { if (dialog.value === 'local') { await createLocalSubscription(name.value); editorName.value = name.value } else await addRemoteSubscription(name.value, url.value); dialog.value = ''; name.value = ''; url.value = ''; await load() } catch (err) { error.value = err.message } }
+onMounted(load); onActivated(load)
+</script>
+
+<template>
+  <div v-if="editorName" class="page editor-page"><div class="section page-actions"><MiuixButton type="secondary" @click="editorName = ''">返回订阅列表</MiuixButton></div><JsonEditor :name="editorName" @saved="load" /></div>
+  <div v-else class="page">
+    <MiuixSmallTitle text="订阅" /><MiuixCard class="section"><MiuixText type="body2" class="muted">当前使用</MiuixText><MiuixText type="body1">{{ active || '未选择' }}</MiuixText><div class="page-actions subscription-add"><MiuixButton type="primary" @click="dialog = 'remote'">添加远程订阅</MiuixButton><MiuixButton type="secondary" @click="dialog = 'local'">新建本地订阅</MiuixButton></div></MiuixCard>
+    <MiuixCard class="section section--compact"><div v-for="item in index.subscriptions" :key="item.name" class="subscription-row"><div><strong>{{ item.name }}</strong><span class="muted">{{ item.type === 'remote' ? item.url : '本地 JSON 配置' }}</span></div><div class="subscription-row__actions"><MiuixButton v-if="item.type === 'local'" type="secondary" @click="editorName = item.name">编辑</MiuixButton><MiuixButton v-if="item.type === 'remote'" type="secondary" :disabled="Boolean(busy)" @click="action('update', item)">更新</MiuixButton><MiuixButton v-if="item.name !== active" type="secondary" :disabled="Boolean(busy)" @click="action('switch', item)">切换</MiuixButton><MiuixButton v-if="item.name !== active" type="secondary" :disabled="Boolean(busy)" @click="action('remove', item)">删除</MiuixButton></div></div></MiuixCard>
+    <MiuixText v-if="error" class="section error" type="body2">{{ error }}</MiuixText>
+    <MiuixDialog v-model="dialog" :title="dialog === 'remote' ? '添加远程订阅' : '新建本地订阅'"><MiuixInput v-model="name" label="名称" /><MiuixInput v-if="dialog === 'remote'" v-model="url" label="订阅 URL" /><template #actions><MiuixButton type="secondary" @click="dialog = ''">取消</MiuixButton><MiuixButton :disabled="!name || (dialog === 'remote' && !url)" @click="create">保存</MiuixButton></template></MiuixDialog>
+  </div>
+</template>
+
+<style scoped>
+.editor-page { height: 100%; display: flex; flex-direction: column; min-height: 0; }.subscription-add { margin-top: 12px; }.subscription-row { padding: 14px 16px; border-bottom: 1px solid var(--m-color-divider-line); }.subscription-row:last-child { border-bottom: 0; }.subscription-row > div:first-child { display: grid; gap: 4px; overflow-wrap: anywhere; }.subscription-row__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+</style>
