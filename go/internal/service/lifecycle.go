@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -29,17 +30,10 @@ type StatusData struct {
 
 // Start launches sing-box with the runtime config.
 func Start(layout *paths.Layout, formatJSON bool) {
-	start(layout, formatJSON, true)
+	start(layout, formatJSON)
 }
 
-// RestartExisting restarts the generated runtime configuration without applying
-// saved edits. This keeps ordinary WebUI restart separate from apply-and-restart.
-func RestartExisting(layout *paths.Layout, formatJSON bool) {
-	restartProcess(layout, false)
-	start(layout, formatJSON, false)
-}
-
-func start(layout *paths.Layout, formatJSON, applyConfig bool) {
+func start(layout *paths.Layout, formatJSON bool) {
 	bin := layout.SingBoxBin()
 	runConfig := layout.RunConfigPath()
 
@@ -55,13 +49,8 @@ func start(layout *paths.Layout, formatJSON, applyConfig bool) {
 		return
 	}
 
-	if applyConfig {
-		if _, err := config.ApplyRuntime(layout); err != nil {
-			result.Err(formatJSON, "service.config_apply_failed", "应用运行配置失败: "+err.Error())
-			return
-		}
-	} else if _, err := os.Stat(runConfig); err != nil {
-		result.Err(formatJSON, "service.runtime_config_missing", "运行配置不存在，请先应用配置")
+	if _, err := config.ApplyRuntime(layout); err != nil {
+		result.Err(formatJSON, "service.config_apply_failed", "应用运行配置失败: "+err.Error())
 		return
 	}
 
@@ -156,9 +145,8 @@ func Stop(layout *paths.Layout, formatJSON bool) {
 		config.TunForwardDisable(layout)
 	}
 
-	// Cleanup atp rules for tproxy/redirect modes
-	mode := readProxyMode(layout)
-	if mode == "tproxy" || mode == "redirect" {
+	// Cleanup ATP only when the generated runtime config used an ATP inbound.
+	if runtimeUsesAtp(layout) {
 		cleanupAtp(layout)
 	}
 
@@ -167,11 +155,11 @@ func Stop(layout *paths.Layout, formatJSON bool) {
 
 // Restart performs stop then start.
 func Restart(layout *paths.Layout, formatJSON bool) {
-	restartProcess(layout, true)
+	restartProcess(layout)
 	Start(layout, formatJSON)
 }
 
-func restartProcess(layout *paths.Layout, cleanRules bool) {
+func restartProcess(layout *paths.Layout) {
 	bin := layout.SingBoxBin()
 	pid := readPID(layout)
 	if pid > 0 && processAlive(pid, bin) {
@@ -185,7 +173,7 @@ func restartProcess(layout *paths.Layout, cleanRules bool) {
 		os.Remove(layout.PidFile())
 
 	}
-	if cleanRules {
+	if runtimeUsesAtp(layout) {
 		cleanupAtp(layout)
 	}
 }
@@ -321,6 +309,32 @@ func cleanupAtp(layout *paths.Layout) {
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	_ = cmd.Run()
+}
+
+// runtimeUsesAtp identifies the FluxNet-generated inbound from the last
+// runtime config. Saved settings can change before a restart, so they cannot
+// safely describe the rules that are active right now.
+func runtimeUsesAtp(layout *paths.Layout) bool {
+	data, err := os.ReadFile(layout.RunConfigPath())
+	if err != nil {
+		return false
+	}
+	var runtime struct {
+		Inbounds []struct {
+			Type string `json:"type"`
+			Tag  string `json:"tag"`
+		} `json:"inbounds"`
+	}
+	if err := json.Unmarshal(data, &runtime); err != nil {
+		return false
+	}
+	for _, inbound := range runtime.Inbounds {
+		if (inbound.Type == "tproxy" && inbound.Tag == "tproxy-in") ||
+			(inbound.Type == "redirect" && inbound.Tag == "redirect-in") {
+			return true
+		}
+	}
+	return false
 }
 
 // readConfigBool reads a boolean-ish config key from fluxnet.config (1/0 or true/false).

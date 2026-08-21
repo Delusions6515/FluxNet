@@ -45,7 +45,6 @@ export const createLocalSubscription = (name) => gateway('local-create', [name])
 export const readLocalSubscription = (name) => gateway('local-read', [name])
 export const writeLocalSubscription = (name, content) => gateway('local-write', [name, encode(content)])
 export const serviceAction = (action) => gateway(`service-${action}`)
-export const applyAndRestart = () => gateway('apply-restart')
 
 export async function getInstalledApps() {
   if (isBrowserDev) return MOCK_PACKAGES

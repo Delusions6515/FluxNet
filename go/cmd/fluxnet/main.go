@@ -121,8 +121,6 @@ func cmdService(layout *paths.Layout, args []string) {
 		service.Stop(layout, jsonOutput)
 	case "restart":
 		service.Restart(layout, jsonOutput)
-	case "restart-existing":
-		service.RestartExisting(layout, jsonOutput)
 	case "logs":
 		logs.Show(layout, jsonOutput)
 	case "status":

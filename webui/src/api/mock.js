@@ -15,7 +15,7 @@ export function mockGateway(command, args = []) {
     case 'config-show': return result('config.settings', '基础设置', state.settings)
     case 'subscription-list': return result('subscription.list', '订阅列表', state.subscriptions)
     case 'logs': return result('logs.list', '日志列表', { entries: [{ timestamp: '2026-08-21T12:00:00Z', level: 'info', component: 'service', event: 'started', result: 'ok', message: 'sing-box is running' }] })
-    case 'service-start': case 'service-restart': case 'apply-restart':
+    case 'service-start': case 'service-restart':
       state.service.running = true; state.service.pid = 2481; state.health.process_alive = true
       return result('service.started', '服务已启动', state.service)
     case 'service-stop':

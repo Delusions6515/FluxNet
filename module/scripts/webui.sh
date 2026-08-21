@@ -23,9 +23,6 @@ case "$command" in
     exec "$FLUXNET" --json service stop
     ;;
   service-restart)
-    exec "$FLUXNET" --json service restart-existing
-    ;;
-  apply-restart)
     exec "$FLUXNET" --json service restart
     ;;
   health)
