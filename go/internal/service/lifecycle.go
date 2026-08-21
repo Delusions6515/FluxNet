@@ -104,13 +104,19 @@ func start(layout *paths.Layout, formatJSON bool) {
 
 // Stop terminates sing-box and cleans up.
 func Stop(layout *paths.Layout, formatJSON bool) {
+	stopProcess(layout)
+	cleanupRuntimeResources(layout, true)
+
+	result.OK(formatJSON, "service.stopped", "服务已停止")
+}
+
+func stopProcess(layout *paths.Layout) {
 	bin := layout.SingBoxBin()
 	pid := readPID(layout)
 
 	if pid <= 0 || !processAlive(pid, bin) {
 		// Clean up stale PID file
 		os.Remove(layout.PidFile())
-		result.OK(formatJSON, "service.stopped", "服务未运行")
 		return
 	}
 
@@ -136,46 +142,28 @@ func Stop(layout *paths.Layout, formatJSON bool) {
 	}
 
 	os.Remove(layout.PidFile())
+}
 
-	// Restore Private DNS
-	restorePrivateDns(layout)
+func cleanupRuntimeResources(layout *paths.Layout, restoreDNS bool) {
+	if restoreDNS {
+		restorePrivateDns(layout)
+	}
 
-	// Tun hotspot forwarding cleanup
 	if mode := readProxyMode(layout); mode == "tun" && readConfigBool(layout, "tun_forward") {
 		config.TunForwardDisable(layout)
 	}
 
-	// Cleanup ATP only when the generated runtime config used an ATP inbound.
 	if runtimeUsesAtp(layout) {
 		cleanupAtp(layout)
 	}
-
-	result.OK(formatJSON, "service.stopped", "服务已停止")
 }
 
 // Restart performs stop then start.
 func Restart(layout *paths.Layout, formatJSON bool) {
-	restartProcess(layout)
+	stopProcess(layout)
+	cleanupRuntimeResources(layout, false)
+
 	Start(layout, formatJSON)
-}
-
-func restartProcess(layout *paths.Layout) {
-	bin := layout.SingBoxBin()
-	pid := readPID(layout)
-	if pid > 0 && processAlive(pid, bin) {
-		proc, _ := os.FindProcess(pid)
-		_ = proc.Signal(syscall.SIGTERM)
-		time.Sleep(stopGraceTimeout)
-		if processAlive(pid, bin) {
-			_ = proc.Signal(syscall.SIGKILL)
-			time.Sleep(500 * time.Millisecond)
-		}
-		os.Remove(layout.PidFile())
-
-	}
-	if runtimeUsesAtp(layout) {
-		cleanupAtp(layout)
-	}
 }
 
 // Status reports the current service state.
