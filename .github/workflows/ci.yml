@@ -12,7 +12,7 @@ on:
         type: choice
         options: [delusions6515-pre, delusions6515-stable, ref1nd-pre, ref1nd-stable, official-pre, official-stable]
   push:
-    branches: [main, dev]
+    branches: [dev]
     paths:
       - 'build.sh'
       - 'go/**'
