@@ -26,10 +26,10 @@ func (t *Template) Apply(mode string) (json.RawMessage, error) {
 		return nil, fmt.Errorf("不支持的代理模式: %s", mode)
 	}
 
-	tplPath := t.layout.InboundTemplate(mode)
-	data, err := os.ReadFile(tplPath)
+	inboundPath := t.layout.InboundData(mode)
+	data, err := os.ReadFile(inboundPath)
 	if err != nil {
-		return nil, fmt.Errorf("入站模板读取失败 (%s): %w", tplPath, err)
+		return nil, fmt.Errorf("入站模板读取失败 (%s): %w", inboundPath, err)
 	}
 
 	var inbound map[string]any

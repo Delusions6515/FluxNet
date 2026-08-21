@@ -35,6 +35,21 @@ func (l *Layout) FluxNetBin() string {
 	return filepath.Join(l.ModuleDir, "bin", "fluxnet")
 }
 
+// InboundDataDir returns the directory containing inbound JSON templates.
+func (l *Layout) InboundDataDir() string {
+	return filepath.Join(l.DataDir, "config", "inbounds")
+}
+
+// InboundData returns the path to a specific inbound template.
+func (l *Layout) InboundData(mode string) string {
+	inboundPath := filepath.Join(l.InboundDataDir(), mode+".json")
+	if fileExists(inboundPath) {
+		return inboundPath
+	} else {
+		return l.InboundTemplate(mode)
+	}
+}
+
 // InboundTemplateDir returns the directory containing inbound JSON templates.
 func (l *Layout) InboundTemplateDir() string {
 	return filepath.Join(l.ModuleDir, "config", "inbounds", "tpl")
