@@ -30,7 +30,7 @@ async function gateway(command, args = []) {
 }
 
 export async function getOverview() {
-  const [service, health, settings, subscriptions, logs] = await Promise.all(['service-status', 'health', 'config-show', 'subscription-list', 'logs'].map(gateway))
+  const [service, health, settings, subscriptions, logs] = await Promise.all(['service-status', 'health', 'config-show', 'subscription-list', 'logs'].map((command) => gateway(command)))
   return { service, health, settings, subscriptions, logs: logs.entries || [] }
 }
 export const getSettings = () => gateway('config-show')
