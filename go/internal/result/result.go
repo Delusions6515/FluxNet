@@ -17,6 +17,13 @@ type Result struct {
 	Data    any    `json:"data,omitempty"`
 }
 
+var operationLogger func(Result)
+
+// SetOperationLogger registers an optional sink for completed CLI operations.
+func SetOperationLogger(logger func(Result)) {
+	operationLogger = logger
+}
+
 // WriteJSON writes the result as a single-line JSON to the writer.
 func WriteJSON(w io.Writer, r Result) {
 	r.Schema = 1
@@ -38,6 +45,9 @@ func Fail(code, message string, data any) Result {
 // Text outputs a human-readable text representation to stdout.
 // The Result is written as JSON to stderr when --json is not set.
 func Text(r Result, formatJSON bool) {
+	if operationLogger != nil {
+		operationLogger(r)
+	}
 	if formatJSON {
 		WriteJSON(os.Stdout, r)
 		return

@@ -1,4 +1,5 @@
 @import url('https://mui.kernelsu.org/internal/insets.css');
+@import '@fontsource-variable/jetbrains-mono/wght.css';
 
 :root { color-scheme: light dark; --top-inset: var(--window-inset-top, 0px); --bottom-inset: var(--window-inset-bottom, 0px); }
 * { box-sizing: border-box; }

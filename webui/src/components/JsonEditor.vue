@@ -6,7 +6,6 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView } from '@codemirror/view'
 import { MiuixButton, MiuixCard, MiuixSmallTitle, MiuixText, showSnackbar, useTheme } from 'miuix-vue'
 import { readLocalSubscription, writeLocalSubscription } from '@/api/module'
-import '@fontsource-variable/jetbrains-mono/wght.css';
 
 const props = defineProps({ name: { type: String, required: true } })
 const emit = defineEmits(['saved'])

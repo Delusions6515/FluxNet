@@ -17,3 +17,10 @@ else
   echo "FluxNet 未运行, 正在启动 ..."
   "$MODDIR/bin/fluxnet" service start
 fi
+action_status=$?
+
+echo ""
+echo "最近操作日志:"
+"$MODDIR/bin/fluxnet" service logs
+
+exit "$action_status"

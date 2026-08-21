@@ -182,6 +182,11 @@ func (l *Layout) AtpLog() string {
 	return filepath.Join(l.LogsDir(), "atp.log")
 }
 
+// OperationLog returns the structured FluxNet CLI operation log.
+func (l *Layout) OperationLog() string {
+	return filepath.Join(l.LogsDir(), "operations.log")
+}
+
 // PrivateDnsStateFile returns the backup file for Android Private DNS mode.
 func (l *Layout) PrivateDnsStateFile() string {
 	return filepath.Join(l.RunDir(), ".private_dns_mode")

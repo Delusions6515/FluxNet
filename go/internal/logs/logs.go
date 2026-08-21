@@ -5,6 +5,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/Delusions6515/FluxNet/internal/paths"
 	"github.com/Delusions6515/FluxNet/internal/result"
@@ -21,8 +22,7 @@ type LogEntry struct {
 }
 
 func Show(layout *paths.Layout, formatJSON bool) {
-	logDir := layout.LogsDir()
-	entries, err := readAllLogs(logDir)
+	entries, err := readOperationLog(layout.OperationLog())
 	if err != nil {
 		result.Err(formatJSON, "logs.read_failed", "读取日志失败: "+err.Error())
 		return
@@ -49,8 +49,33 @@ func Show(layout *paths.Layout, formatJSON bool) {
 	}
 }
 
-func readAllLogs(dir string) ([]LogEntry, error) {
-	files, err := os.ReadDir(dir)
+// RecordOperation appends a structured result for a mutating CLI command.
+// Read-only polling commands are deliberately excluded to keep WebUI useful.
+func RecordOperation(layout *paths.Layout, operation result.Result) {
+	if !isOperation(operation.Code) {
+		return
+	}
+	if err := os.MkdirAll(layout.LogsDir(), 0755); err != nil {
+		return
+	}
+	file, err := os.OpenFile(layout.OperationLog(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	component, event := operationParts(operation.Code)
+	level, status, errorCode := "info", "ok", ""
+	if !operation.OK {
+		level, status, errorCode = "error", "failed", operation.Code
+	}
+	message := strings.Join(strings.Fields(operation.Message), " ")
+	_, _ = fmt.Fprintf(file, "[%s] [%s] [%s] [%s] [%s] [%s] %s\n",
+		time.Now().UTC().Format(time.RFC3339), level, component, event, status, errorCode, message)
+}
+
+func readOperationLog(path string) ([]LogEntry, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -58,27 +83,35 @@ func readAllLogs(dir string) ([]LogEntry, error) {
 		return nil, err
 	}
 	var entries []LogEntry
-	for _, f := range files {
-		if f.IsDir() || !strings.HasSuffix(f.Name(), ".log") {
+	for _, raw := range strings.Split(string(data), "\n") {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
 			continue
 		}
-		data, err := os.ReadFile(dir + "/" + f.Name())
-		if err != nil {
-			continue
-		}
-		for _, raw := range strings.Split(string(data), "\n") {
-			raw = strings.TrimSpace(raw)
-			if raw == "" {
-				continue
-			}
-			raw = redact(raw)
-			entry := parseLine(raw)
-			if entry != nil {
-				entries = append(entries, *entry)
-			}
+		raw = redact(raw)
+		entry := parseLine(raw)
+		if entry != nil {
+			entries = append(entries, *entry)
 		}
 	}
 	return entries, nil
+}
+
+func isOperation(code string) bool {
+	switch code {
+	case "service.status", "health.check", "config.settings", "subscription.list", "subscription.local_read", "app.list", "logs.list", "version":
+		return false
+	default:
+		return code != ""
+	}
+}
+
+func operationParts(code string) (string, string) {
+	component, event, found := strings.Cut(code, ".")
+	if !found {
+		return "fluxnet", code
+	}
+	return component, event
 }
 
 func parseLine(line string) *LogEntry {
@@ -91,7 +124,7 @@ func parseLine(line string) *LogEntry {
 	cmp := strings.Trim(parts[2], "[]")
 	evt := strings.Trim(parts[3], "[]")
 	rst := strings.Trim(parts[4], "[]")
-	ec  := strings.Trim(parts[5], "[]")
+	ec := strings.Trim(parts[5], "[]")
 	msg := ""
 	if len(parts) == 7 {
 		msg = parts[6]

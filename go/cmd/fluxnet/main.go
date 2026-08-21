@@ -41,6 +41,9 @@ func main() {
 	}
 
 	layout := paths.New(moduleDir, dataDir)
+	result.SetOperationLogger(func(operation result.Result) {
+		logs.RecordOperation(layout, operation)
+	})
 
 	switch args[0] {
 	case "service":
