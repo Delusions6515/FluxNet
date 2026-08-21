@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Codemirror } from 'vue-codemirror'
 import { json } from '@codemirror/lang-json'
 import { oneDark } from '@codemirror/theme-one-dark'
@@ -29,6 +29,7 @@ async function save() {
   try { await writeLocalSubscription(props.name, content.value); original.value = content.value; showSnackbar({ message: '本地订阅已保存', withDismissAction: true }); emit('saved') } catch (err) { error.value = err.message; showError(err) } finally { saving.value = false }
 }
 onMounted(load)
+watch(() => props.name, (name) => { if (name) load() })
 </script>
 
 <template>
