@@ -1,12 +1,15 @@
 package app
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"sort"
 	"strings"
 
+	"github.com/Delusions6515/FluxNet/internal/config"
 	"github.com/Delusions6515/FluxNet/internal/paths"
 	"github.com/Delusions6515/FluxNet/internal/result"
 )
@@ -91,6 +94,27 @@ func Show(layout *paths.Layout, jsonFormat bool) {
 // Upgrade is a placeholder for updating the default proxy list from online.
 func Upgrade(layout *paths.Layout, jsonFormat bool) {
 	result.OK(jsonFormat, "app.upgraded", "预置名单已更新")
+}
+
+// Replace updates the user-managed application list used by the WebUI.
+// The list is base64-encoded JSON so package names never become shell syntax.
+func Replace(layout *paths.Layout, jsonFormat bool, mode, encoded string) {
+	data, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		result.Err(jsonFormat, "app.invalid_input", "应用名单编码无效")
+		return
+	}
+	var apps []string
+	if err := json.Unmarshal(data, &apps); err != nil {
+		result.Err(jsonFormat, "app.invalid_input", "应用名单必须是 JSON 数组")
+		return
+	}
+	settings, err := config.ReplaceAppList(layout, mode, apps)
+	if err != nil {
+		result.Err(jsonFormat, "app.write_failed", err.Error())
+		return
+	}
+	result.Text(result.Success("app.replaced", "应用名单已保存", settings), jsonFormat)
 }
 
 func readLines(path string) []string {

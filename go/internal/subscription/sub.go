@@ -1,6 +1,7 @@
 package subscription
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -44,6 +45,10 @@ func Add(layout *paths.Layout, formatJSON bool, urlOrPath, name string) {
 	}
 	if name == "" {
 		result.Err(formatJSON, "subscription.invalid_name", "订阅名称不能为空")
+		return
+	}
+	if !validName(name) {
+		result.Err(formatJSON, "subscription.invalid_name", "订阅名称只能包含字母、数字、点、下划线和连字符")
 		return
 	}
 
@@ -109,6 +114,99 @@ func Add(layout *paths.Layout, formatJSON bool, urlOrPath, name string) {
 	}
 
 	result.OK(formatJSON, "subscription.added", "订阅已添加: "+name)
+}
+
+// CreateLocal creates an editable local sing-box configuration.
+func CreateLocal(layout *paths.Layout, formatJSON bool, name string) {
+	idx, err := loadIndex(layout)
+	if err != nil {
+		result.Err(formatJSON, "subscription.load_failed", "读取订阅索引失败: "+err.Error())
+		return
+	}
+	if !validName(name) {
+		result.Err(formatJSON, "subscription.invalid_name", "订阅名称只能包含字母、数字、点、下划线和连字符")
+		return
+	}
+	if _, found := find(idx, name); found {
+		result.Err(formatJSON, "subscription.duplicate", "订阅名称已存在: "+name)
+		return
+	}
+	if err := os.MkdirAll(layout.LocalConfigDir(), 0755); err != nil {
+		result.Err(formatJSON, "subscription.write_failed", "创建目录失败: "+err.Error())
+		return
+	}
+	content := []byte("{\n  \"log\": { \"level\": \"info\" },\n  \"inbounds\": [],\n  \"outbounds\": [{ \"type\": \"direct\", \"tag\": \"direct\" }],\n  \"route\": { \"rules\": [], \"final\": \"direct\" }\n}\n")
+	filename := name + ".json"
+	if err := os.WriteFile(filepath.Join(layout.LocalConfigDir(), filename), content, 0600); err != nil {
+		result.Err(formatJSON, "subscription.write_failed", "写入配置失败: "+err.Error())
+		return
+	}
+	idx.Subscriptions = append(idx.Subscriptions, Subscription{Name: name, Type: "local", Filename: filename, UpdatedAt: time.Now().UTC().Format(time.RFC3339)})
+	if err := saveIndex(layout, idx); err != nil {
+		result.Err(formatJSON, "subscription.save_failed", "保存索引失败: "+err.Error())
+		return
+	}
+	result.Text(result.Success("subscription.local_created", "本地订阅已创建: "+name, map[string]any{"name": name, "content": string(content)}), formatJSON)
+}
+
+func ReadLocal(layout *paths.Layout, formatJSON bool, name string) {
+	idx, err := loadIndex(layout)
+	if err != nil {
+		result.Err(formatJSON, "subscription.load_failed", "读取订阅索引失败: "+err.Error())
+		return
+	}
+	sub, found := find(idx, name)
+	if !found || sub.Type != "local" {
+		result.Err(formatJSON, "subscription.not_local", "未找到本地订阅: "+name)
+		return
+	}
+	data, err := os.ReadFile(filepath.Join(layout.LocalConfigDir(), sub.Filename))
+	if err != nil {
+		result.Err(formatJSON, "subscription.read_failed", "读取本地订阅失败: "+err.Error())
+		return
+	}
+	result.Text(result.Success("subscription.local_read", "本地订阅", map[string]any{"name": name, "content": string(data)}), formatJSON)
+}
+
+func WriteLocal(layout *paths.Layout, formatJSON bool, name, encoded string) {
+	idx, err := loadIndex(layout)
+	if err != nil {
+		result.Err(formatJSON, "subscription.load_failed", "读取订阅索引失败: "+err.Error())
+		return
+	}
+	sub, found := find(idx, name)
+	if !found || sub.Type != "local" {
+		result.Err(formatJSON, "subscription.not_local", "未找到本地订阅: "+name)
+		return
+	}
+	data, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		result.Err(formatJSON, "subscription.invalid_json", "JSON 编码无效")
+		return
+	}
+	var document any
+	if err := json.Unmarshal(data, &document); err != nil {
+		result.Err(formatJSON, "subscription.invalid_json", "JSON 格式无效: "+err.Error())
+		return
+	}
+	if _, ok := document.(map[string]any); !ok {
+		result.Err(formatJSON, "subscription.invalid_json", "订阅必须是 JSON 对象")
+		return
+	}
+	if err := os.WriteFile(filepath.Join(layout.LocalConfigDir(), sub.Filename), data, 0600); err != nil {
+		result.Err(formatJSON, "subscription.write_failed", "写入本地订阅失败: "+err.Error())
+		return
+	}
+	for i := range idx.Subscriptions {
+		if idx.Subscriptions[i].Name == name {
+			idx.Subscriptions[i].UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+		}
+	}
+	if err := saveIndex(layout, idx); err != nil {
+		result.Err(formatJSON, "subscription.save_failed", "保存索引失败: "+err.Error())
+		return
+	}
+	result.OK(formatJSON, "subscription.local_written", "本地订阅已保存")
 }
 
 // Update refreshes a remote subscription by name, or all if name is empty.
@@ -296,6 +394,27 @@ func saveIndex(layout *paths.Layout, idx *Index) error {
 		return err
 	}
 	return os.WriteFile(layout.SubscriptionFile(), data, 0600)
+}
+
+func find(idx *Index, name string) (Subscription, bool) {
+	for _, sub := range idx.Subscriptions {
+		if sub.Name == name {
+			return sub, true
+		}
+	}
+	return Subscription{}, false
+}
+
+func validName(name string) bool {
+	if name == "" || strings.Contains(name, "..") {
+		return false
+	}
+	for _, r := range name {
+		if !(r == '.' || r == '_' || r == '-' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9') {
+			return false
+		}
+	}
+	return true
 }
 
 func download(url string) ([]byte, error) {

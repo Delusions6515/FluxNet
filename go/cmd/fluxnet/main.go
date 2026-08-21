@@ -74,7 +74,7 @@ func usage() {
 
 命令:
   service start|stop|restart|status|logs  服务生命周期管理
-  config apply                       组装运行配置
+  config apply|show|set              运行配置和基础设置
   subscription add|update|list|remove|switch  订阅管理
   worker start|stop                  后台 Worker
   health                             健康检查
@@ -135,7 +135,23 @@ func cmdConfig(layout *paths.Layout, args []string) {
 		config.Apply(layout, jsonOutput)
 		return
 	}
-	result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config apply")
+	switch args[0] {
+	case "show":
+		result.Text(result.Success("config.settings", "基础设置", config.ReadSettings(layout)), jsonOutput)
+	case "set":
+		if len(args) != 3 {
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config set <key> <value>")
+			return
+		}
+		settings, err := config.UpdateSetting(layout, args[1], args[2])
+		if err != nil {
+			result.Err(jsonOutput, "config.invalid_setting", err.Error())
+			return
+		}
+		result.Text(result.Success("config.updated", "设置已保存", settings), jsonOutput)
+	default:
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config apply|show|set <key> <value>")
+	}
 }
 
 func cmdSubscription(layout *paths.Layout, args []string) {
@@ -144,6 +160,8 @@ func cmdSubscription(layout *paths.Layout, args []string) {
 		return
 	}
 	switch args[0] {
+	case "local":
+		cmdLocalSubscription(layout, args[1:])
 	case "add":
 		urlOrPath := ""
 		name := ""
@@ -179,7 +197,36 @@ func cmdSubscription(layout *paths.Layout, args []string) {
 		}
 		subscription.Switch(layout, jsonOutput, args[1])
 	default:
-		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet subscription add|update|list|remove|switch")
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet subscription add|update|list|remove|switch|local")
+	}
+}
+
+func cmdLocalSubscription(layout *paths.Layout, args []string) {
+	if len(args) == 0 {
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet subscription local create|read|write")
+		return
+	}
+	switch args[0] {
+	case "create":
+		if len(args) != 2 {
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet subscription local create <name>")
+			return
+		}
+		subscription.CreateLocal(layout, jsonOutput, args[1])
+	case "read":
+		if len(args) != 2 {
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet subscription local read <name>")
+			return
+		}
+		subscription.ReadLocal(layout, jsonOutput, args[1])
+	case "write":
+		if len(args) != 3 {
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet subscription local write <name> <base64-json>")
+			return
+		}
+		subscription.WriteLocal(layout, jsonOutput, args[1], args[2])
+	default:
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet subscription local create|read|write")
 	}
 }
 
@@ -212,8 +259,14 @@ func cmdAppList(layout *paths.Layout, args []string) {
 		app.Show(layout, jsonOutput)
 	case "upgrade":
 		app.Upgrade(layout, jsonOutput)
+	case "replace":
+		if len(args) != 3 {
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list replace <whitelist|blacklist> <base64-json>")
+			return
+		}
+		app.Replace(layout, jsonOutput, args[1], args[2])
 	default:
-		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list update|show|upgrade")
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list update|show|upgrade|replace")
 	}
 }
 
