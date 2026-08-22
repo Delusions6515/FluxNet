@@ -1,0 +1,30 @@
+#!/bin/sh
+
+set -e
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+if command -v pnpm >/dev/null 2>&1; then
+	pnpm_cmd=$(command -v pnpm)
+else
+	for candidate in \
+		"$HOME/.npm-global/bin/pnpm" \
+		"$HOME/.local/share/pnpm/pnpm" \
+		"$HOME/.local/bin/pnpm" \
+		/usr/local/bin/pnpm
+	do
+		if [ -x "$candidate" ]; then
+			pnpm_cmd=$candidate
+			break
+		fi
+	done
+fi
+
+if [ -z "${pnpm_cmd:-}" ]; then
+	echo "pre-commit: pnpm not found; install pnpm or add it to PATH" >&2
+	exit 1
+fi
+
+"$pnpm_cmd" --dir webui format
+git add -u -- webui
