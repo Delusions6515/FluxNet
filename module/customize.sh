@@ -134,6 +134,16 @@ if [ ! -f "$CONFIG_DIR/fluxnet.config" ]; then
   esac
 fi
 
+# 名单已迁移到独立文件；旧值不保留，避免更新后仍参与运行时配置。
+sed -i \
+  -e '/^[[:space:]]*proxy_apps_list=/d' \
+  -e '/^[[:space:]]*bypass_apps_list=/d' \
+  -e '/^[[:space:]]*auto_proxy_apps_enable=/d' \
+  "$CONFIG_DIR/fluxnet.config"
+if ! grep -q '^[[:space:]]*auto_mode=' "$CONFIG_DIR/fluxnet.config"; then
+  printf '\nauto_mode=0\n' >> "$CONFIG_DIR/fluxnet.config"
+fi
+
 # subscription.json: 默认索引
 if [ ! -f "$CONFIG_DIR/subscription.json" ]; then
   ui_print "- 写入订阅索引 subscription.json"
@@ -171,7 +181,14 @@ if [ ! -f "$LOCAL_CONFIG_DIR/default.json" ]; then
 DCEOF
 fi
 
-# force_proxy_app.txt / force_bypass_app.txt
+# 构建期内置的 v2rayNG 原始清单每次模块更新都刷新；其余名单由用户维护。
+cp -f "$MODPATH/config/proxy_package_name" "$CONFIG_DIR/proxy_package_name"
+if [ ! -f "$CONFIG_DIR/proxy_app.txt" ]; then
+  cp -f "$MODPATH/config/proxy_app.txt" "$CONFIG_DIR/proxy_app.txt"
+fi
+if [ ! -f "$CONFIG_DIR/bypass_app.txt" ]; then
+  cp -f "$MODPATH/config/bypass_app.txt" "$CONFIG_DIR/bypass_app.txt"
+fi
 if [ ! -f "$CONFIG_DIR/force_proxy_app.txt" ]; then
   cp -f "$MODPATH/config/force_proxy_app.txt" "$CONFIG_DIR/force_proxy_app.txt"
 fi
@@ -188,6 +205,9 @@ chmod 755 "$BIN_DIR/sing-box" 2>/dev/null
 chmod 755 "$BIN_DIR/atp" 2>/dev/null
 set_perm "$CONFIG_DIR/fluxnet.config" 0 0 0600 2>/dev/null
 set_perm "$CONFIG_DIR/subscription.json" 0 0 0600 2>/dev/null
+set_perm "$CONFIG_DIR/proxy_package_name" 0 0 0600 2>/dev/null
+set_perm "$CONFIG_DIR/proxy_app.txt" 0 0 0600 2>/dev/null
+set_perm "$CONFIG_DIR/bypass_app.txt" 0 0 0600 2>/dev/null
 set_perm "$CONFIG_DIR/force_proxy_app.txt" 0 0 0600 2>/dev/null
 set_perm "$CONFIG_DIR/force_bypass_app.txt" 0 0 0600 2>/dev/null
 set_perm "$LOCAL_CONFIG_DIR/default.json" 0 0 0600 2>/dev/null

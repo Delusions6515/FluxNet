@@ -75,6 +75,11 @@ func (l *Layout) ModFluxNetConfig() string {
 	return filepath.Join(l.ModuleDir, "config", "fluxnet.config")
 }
 
+// ModProxyPackageList returns the v2rayNG package catalogue bundled with the module.
+func (l *Layout) ModProxyPackageList() string {
+	return filepath.Join(l.ModuleDir, "config", "proxy_package_name")
+}
+
 // ScriptsDir returns the module scripts directory.
 func (l *Layout) ScriptsDir() string {
 	return filepath.Join(l.ModuleDir, "scripts")
@@ -145,9 +150,29 @@ func (l *Layout) ForceBypassApps() string {
 	return filepath.Join(l.ConfigDir(), "force_bypass_app.txt")
 }
 
+// ProxyApps returns the user-managed base proxy application list.
+func (l *Layout) ProxyApps() string {
+	return filepath.Join(l.ConfigDir(), "proxy_app.txt")
+}
+
+// BypassApps returns the user-managed base bypass application list.
+func (l *Layout) BypassApps() string {
+	return filepath.Join(l.ConfigDir(), "bypass_app.txt")
+}
+
 // ProxyPackageList returns the cached v2rayNG proxy-package catalogue.
 func (l *Layout) ProxyPackageList() string {
 	return filepath.Join(l.ConfigDir(), "proxy_package_name")
+}
+
+// ProxyPackageCatalog returns the user-updated catalogue when available,
+// otherwise the module-bundled catalogue.
+func (l *Layout) ProxyPackageCatalog() string {
+	dataList := l.ProxyPackageList()
+	if fileExists(dataList) {
+		return dataList
+	}
+	return l.ModProxyPackageList()
 }
 
 // ---- Runtime paths (under DataDir) ----

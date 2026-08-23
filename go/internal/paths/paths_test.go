@@ -38,6 +38,14 @@ func TestRunConfigPath(t *testing.T) {
 	}
 }
 
+func TestProxyPackageCatalogPrefersDataDirectory(t *testing.T) {
+	root := t.TempDir()
+	l := New(root+"/module", root+"/data")
+	if got, want := l.ProxyPackageCatalog(), l.ModProxyPackageList(); got != want {
+		t.Errorf("fallback catalogue = %q, want %q", got, want)
+	}
+}
+
 func TestPidFile(t *testing.T) {
 	l := New("", "")
 	if l.PidFile() != "/data/adb/fluxnet/run/sing-box.pid" {

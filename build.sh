@@ -114,7 +114,45 @@ info "编译 fluxnet (GOOS=android GOARCH=$GOARCH${GOARM:+ GOARM=$GOARM} CGO_ENA
 )
 info "fluxnet: $MODULE_DIR/bin/fluxnet"
 
-# ---------- 2. 构建暂存 ----------
+# ---------- 2. 获取 v2rayNG 代理应用名单 (带版本缓存) ----------
+# 用户设备上的数据目录副本由安装脚本保留，模块内置清单随构建版本刷新。
+PROXY_PACKAGE_LIST_URL="https://raw.githubusercontent.com/2dust/v2rayNG/master/V2rayNG/app/src/main/assets/proxy_package_name"
+PROXY_PACKAGE_LIST="$MODULE_DIR/config/proxy_package_name"
+PROXY_PACKAGE_CACHE="$CACHE_DIR/proxy_package_name"
+PROXY_PACKAGE_VER_FILE="$CACHE_DIR/proxy_package_name_version"
+PROXY_PACKAGE_VER=$(api_get "/repos/2dust/v2rayNG/commits/master" \
+  | sed -n 's/.*"sha"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+PROXY_PACKAGE_VER="${PROXY_PACKAGE_VER:0:7}"
+current_proxy_package_ver=""
+[ -f "$PROXY_PACKAGE_VER_FILE" ] && current_proxy_package_ver=$(cat "$PROXY_PACKAGE_VER_FILE")
+
+need_proxy_package=0
+if [ ! -f "$PROXY_PACKAGE_CACHE" ]; then
+  need_proxy_package=1
+elif [ "${SKIP_VERSION_CHECK:-0}" != "1" ] \
+  && [ -n "$PROXY_PACKAGE_VER" ] \
+  && [ "$current_proxy_package_ver" != "$PROXY_PACKAGE_VER" ]; then
+  warn "版本检查: v2rayNG 清单过旧 (缓存=${current_proxy_package_ver:-无}, 最新=$PROXY_PACKAGE_VER), 重新下载"
+  need_proxy_package=1
+fi
+
+if [ "$need_proxy_package" = "1" ]; then
+  info "下载 v2rayNG 代理应用名单 ..."
+  download "$PROXY_PACKAGE_LIST_URL" "$PROXY_PACKAGE_CACHE.tmp" \
+    || die "下载 v2rayNG 代理应用名单失败"
+  if ! grep -qE '^[[:alnum:]_]+(\.[[:alnum:]_]+)+$' "$PROXY_PACKAGE_CACHE.tmp"; then
+    rm -f "$PROXY_PACKAGE_CACHE.tmp"
+    die "v2rayNG 代理应用名单为空或格式无效"
+  fi
+  mv -f "$PROXY_PACKAGE_CACHE.tmp" "$PROXY_PACKAGE_CACHE"
+  [ -n "$PROXY_PACKAGE_VER" ] && echo "$PROXY_PACKAGE_VER" > "$PROXY_PACKAGE_VER_FILE"
+  info "v2rayNG 清单: ${PROXY_PACKAGE_VER:-已获取} (已缓存)"
+else
+  info "v2rayNG 清单: 使用缓存 ${current_proxy_package_ver:-无版本号}"
+fi
+cp -f "$PROXY_PACKAGE_CACHE" "$PROXY_PACKAGE_LIST"
+
+# ---------- 3. 构建暂存 ----------
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 cp -r "$MODULE_DIR/." "$STAGE/"

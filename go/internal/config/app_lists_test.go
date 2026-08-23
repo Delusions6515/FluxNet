@@ -1,6 +1,8 @@
 package config
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -17,35 +19,45 @@ func TestNormalizePackageList(t *testing.T) {
 	}
 }
 
-func TestAutomaticAppListsUsesCurrentUserPackages(t *testing.T) {
+func TestProxyPackageCatalogPrefersDataDirectory(t *testing.T) {
 	root := t.TempDir()
 	layout := paths.New(filepath.Join(root, "module"), filepath.Join(root, "data"))
+	if err := os.MkdirAll(filepath.Dir(layout.ModProxyPackageList()), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(layout.ModProxyPackageList(), []byte("com.example.module\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	packages, err := ReadPackageList(layout.ProxyPackageCatalog())
+	if err != nil || !reflect.DeepEqual(packages, []string{"com.example.module"}) {
+		t.Fatalf("module catalogue = %#v, %v", packages, err)
+	}
 	if err := os.MkdirAll(layout.ConfigDir(), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(layout.ProxyPackageList(), []byte("com.example.proxy\n"), 0600); err != nil {
+	if err := os.WriteFile(layout.ProxyPackageList(), []byte("com.example.data\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	bin := filepath.Join(root, "bin")
-	if err := os.MkdirAll(bin, 0755); err != nil {
-		t.Fatal(err)
-	}
-	writeCommand(t, bin, "cmd", "#!/bin/sh\necho 10\n")
-	writeCommand(t, bin, "pm", "#!/bin/sh\n[ \"$4\" = \"10\" ] || exit 1\nprintf '%s\\n' package:com.example.direct package:com.example.proxy\n")
-	t.Setenv("PATH", bin+":"+os.Getenv("PATH"))
-
-	proxy, bypass, err := automaticAppLists(layout)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(proxy, []string{"com.example.proxy"}) || !reflect.DeepEqual(bypass, []string{"com.example.direct"}) {
-		t.Fatalf("automatic lists = %#v, %#v", proxy, bypass)
+	packages, err = ReadPackageList(layout.ProxyPackageCatalog())
+	if err != nil || !reflect.DeepEqual(packages, []string{"com.example.data"}) {
+		t.Fatalf("data catalogue = %#v, %v", packages, err)
 	}
 }
 
-func writeCommand(t *testing.T, dir, name, content string) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0755); err != nil {
-		t.Fatal(err)
+func TestUpdateProxyPackageListWritesValidatedResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("com.example.proxy\ninvalid package\ncom.example.proxy\n"))
+	}))
+	defer server.Close()
+
+	root := t.TempDir()
+	layout := paths.New(filepath.Join(root, "module"), filepath.Join(root, "data"))
+	count, err := updateProxyPackageList(layout, server.URL)
+	if err != nil || count != 1 {
+		t.Fatalf("updateProxyPackageList = %d, %v", count, err)
+	}
+	data, err := os.ReadFile(layout.ProxyPackageList())
+	if err != nil || string(data) != "com.example.proxy\n" {
+		t.Fatalf("updated catalogue = %q, %v", data, err)
 	}
 }

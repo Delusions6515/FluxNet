@@ -66,9 +66,9 @@ case "$command" in
     [ "$#" = 1 ] || exit 2
     exec "$FLUXNET" --json app-list upgrade
     ;;
-  app-list-installed)
+  app-list-catalog)
     [ "$#" = 1 ] || exit 2
-    exec "$FLUXNET" --json app-list installed
+    exec "$FLUXNET" --json app-list catalog
     ;;
   subscription-list)
     exec "$FLUXNET" --json subscription list

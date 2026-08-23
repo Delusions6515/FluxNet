@@ -10,16 +10,11 @@ import (
 	"github.com/Delusions6515/FluxNet/internal/result"
 )
 
-// Update refreshes the v2rayNG proxy-package catalogue.
-func Update(layout *paths.Layout, jsonFormat bool) {
-	Upgrade(layout, jsonFormat)
-}
-
-// Show reads and displays the current app lists.
+// Show reads and displays the current base application lists.
 func Show(layout *paths.Layout, jsonFormat bool) {
 	settings := config.ReadSettings(layout)
-	proxyApps := settings.ForceProxyApps
-	bypassApps := settings.ForceBypassApps
+	proxyApps := settings.ProxyApps
+	bypassApps := settings.BypassApps
 
 	data := map[string]any{
 		"proxy":  proxyApps,
@@ -47,6 +42,17 @@ func Show(layout *paths.Layout, jsonFormat bool) {
 			fmt.Printf("  %s\n", p)
 		}
 	}
+}
+
+// Catalog returns the local v2rayNG package catalogue. The data-directory
+// update takes precedence over the module-bundled fallback.
+func Catalog(layout *paths.Layout, jsonFormat bool) {
+	packages, err := config.ReadPackageList(layout.ProxyPackageCatalog())
+	if err != nil {
+		result.Err(jsonFormat, "app.catalog_read_failed", err.Error())
+		return
+	}
+	result.Text(result.Success("app.catalog", "预置名单", map[string]any{"packages": packages}), jsonFormat)
 }
 
 // Upgrade downloads the latest v2rayNG proxy package catalogue.
@@ -98,18 +104,4 @@ func ReplaceForce(layout *paths.Layout, jsonFormat bool, kind, encoded string) {
 		return
 	}
 	result.Text(result.Success("app.force_replaced", "强制应用名单已保存", settings), jsonFormat)
-}
-
-// Installed returns package names through the module CLI, not the WebUI shell bridge.
-func Installed(jsonFormat bool) {
-	packages, err := config.ListInstalledPackages()
-	if err != nil {
-		result.Err(jsonFormat, "app.pm_failed", err.Error())
-		return
-	}
-	apps := make([]map[string]string, 0, len(packages))
-	for _, packageName := range packages {
-		apps = append(apps, map[string]string{"packageName": packageName, "appLabel": packageName})
-	}
-	result.Text(result.Success("app.installed", "已安装应用", map[string]any{"apps": apps}), jsonFormat)
 }

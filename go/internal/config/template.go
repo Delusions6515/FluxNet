@@ -106,28 +106,21 @@ func effectiveAppProxy(layout *paths.Layout) (appProxySettings, error) {
 		mode = "blacklist"
 	}
 
-	forceProxy := readAppList(layout.ForceProxyApps())
-	forceBypass := readAppList(layout.ForceBypassApps())
-	if cfg["app_proxy_enable"] != "1" && len(forceProxy) == 0 && len(forceBypass) == 0 {
-		return appProxySettings{mode: mode}, nil
-	}
 	if cfg["app_proxy_enable"] != "1" {
-		mode = "blacklist"
+		return appProxySettings{mode: mode}, nil
 	}
 
 	settings := appProxySettings{enabled: true, mode: mode}
-	autoProxy, autoBypass := []string(nil), []string(nil)
-	if cfg["app_proxy_enable"] == "1" && cfg["auto_proxy_apps_enable"] == "1" {
-		var err error
-		autoProxy, autoBypass, err = automaticAppLists(layout)
-		if err != nil {
-			return appProxySettings{}, err
-		}
-	}
 	if mode == "whitelist" {
-		settings.proxyApps = removeApps(append(append(autoProxy, parseAppList(cfg["proxy_apps_list"])...), forceProxy...), forceBypass)
+		settings.proxyApps = readAppList(layout.ProxyApps())
+		if cfg["auto_mode"] == "1" {
+			settings.proxyApps = removeApps(settings.proxyApps, readAppList(layout.ForceBypassApps()))
+		}
 	} else {
-		settings.bypassApps = removeApps(append(append(autoBypass, parseAppList(cfg["bypass_apps_list"])...), forceBypass...), forceProxy)
+		settings.bypassApps = readAppList(layout.BypassApps())
+		if cfg["auto_mode"] == "1" {
+			settings.bypassApps = removeApps(settings.bypassApps, readAppList(layout.ForceProxyApps()))
+		}
 	}
 	return settings, nil
 }

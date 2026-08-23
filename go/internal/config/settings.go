@@ -11,18 +11,18 @@ import (
 
 // Settings is the small, deliberately safe configuration surface exposed to WebUI.
 type Settings struct {
-	Autostart           bool     `json:"autostart"`
-	ProxyMode           string   `json:"proxy_mode"`
-	TunStack            string   `json:"tun_stack"`
-	AutoRedirect        bool     `json:"auto_redirect"`
-	TunForward          bool     `json:"tun_forward"`
-	AppProxyEnable      bool     `json:"app_proxy_enable"`
-	AppProxyMode        string   `json:"app_proxy_mode"`
-	AutoProxyAppsEnable bool     `json:"auto_proxy_apps_enable"`
-	ProxyApps           []string `json:"proxy_apps"`
-	BypassApps          []string `json:"bypass_apps"`
-	ForceProxyApps      []string `json:"force_proxy_apps"`
-	ForceBypassApps     []string `json:"force_bypass_apps"`
+	Autostart       bool     `json:"autostart"`
+	ProxyMode       string   `json:"proxy_mode"`
+	TunStack        string   `json:"tun_stack"`
+	AutoRedirect    bool     `json:"auto_redirect"`
+	TunForward      bool     `json:"tun_forward"`
+	AppProxyEnable  bool     `json:"app_proxy_enable"`
+	AppProxyMode    string   `json:"app_proxy_mode"`
+	AutoMode        bool     `json:"auto_mode"`
+	ProxyApps       []string `json:"proxy_apps"`
+	BypassApps      []string `json:"bypass_apps"`
+	ForceProxyApps  []string `json:"force_proxy_apps"`
+	ForceBypassApps []string `json:"force_bypass_apps"`
 }
 
 func ReadSettings(layout *paths.Layout) Settings {
@@ -40,37 +40,37 @@ func ReadSettings(layout *paths.Layout) Settings {
 		stack = "gvisor"
 	}
 	return Settings{
-		Autostart:           kv["autostart"] != "0",
-		ProxyMode:           mode,
-		TunStack:            stack,
-		AutoRedirect:        kv["auto_redirect"] != "0",
-		TunForward:          kv["tun_forward"] == "1",
-		AppProxyEnable:      kv["app_proxy_enable"] == "1",
-		AppProxyMode:        appMode,
-		AutoProxyAppsEnable: kv["auto_proxy_apps_enable"] == "1",
-		ProxyApps:           parseAppList(kv["proxy_apps_list"]),
-		BypassApps:          parseAppList(kv["bypass_apps_list"]),
-		ForceProxyApps:      readAppList(layout.ForceProxyApps()),
-		ForceBypassApps:     readAppList(layout.ForceBypassApps()),
+		Autostart:       kv["autostart"] != "0",
+		ProxyMode:       mode,
+		TunStack:        stack,
+		AutoRedirect:    kv["auto_redirect"] != "0",
+		TunForward:      kv["tun_forward"] == "1",
+		AppProxyEnable:  kv["app_proxy_enable"] == "1",
+		AppProxyMode:    appMode,
+		AutoMode:        kv["auto_mode"] == "1",
+		ProxyApps:       readAppList(layout.ProxyApps()),
+		BypassApps:      readAppList(layout.BypassApps()),
+		ForceProxyApps:  readAppList(layout.ForceProxyApps()),
+		ForceBypassApps: readAppList(layout.ForceBypassApps()),
 	}
 }
 
 func UpdateSetting(layout *paths.Layout, key, value string) (Settings, error) {
 	allowed := map[string]map[string]bool{
-		"autostart":              {"0": true, "1": true},
-		"proxy_mode":             {"tun": true, "tproxy": true, "redirect": true, "ebpf": true},
-		"tun_stack":              {"system": true, "gvisor": true, "mixed": true},
-		"auto_redirect":          {"0": true, "1": true},
-		"tun_forward":            {"0": true, "1": true},
-		"app_proxy_enable":       {"0": true, "1": true},
-		"app_proxy_mode":         {"whitelist": true, "blacklist": true},
-		"auto_proxy_apps_enable": {"0": true, "1": true},
+		"autostart":        {"0": true, "1": true},
+		"proxy_mode":       {"tun": true, "tproxy": true, "redirect": true, "ebpf": true},
+		"tun_stack":        {"system": true, "gvisor": true, "mixed": true},
+		"auto_redirect":    {"0": true, "1": true},
+		"tun_forward":      {"0": true, "1": true},
+		"app_proxy_enable": {"0": true, "1": true},
+		"app_proxy_mode":   {"whitelist": true, "blacklist": true},
+		"auto_mode":        {"0": true, "1": true},
 	}
 	if !allowed[key][value] {
 		return Settings{}, fmt.Errorf("不支持的设置: %s=%s", key, value)
 	}
-	if key == "auto_proxy_apps_enable" && value == "1" {
-		if apps, err := readPackageFile(layout.ProxyPackageList()); err != nil || len(apps) == 0 {
+	if key == "auto_mode" && value == "1" {
+		if apps, err := readPackageFile(layout.ProxyPackageCatalog()); err != nil || len(apps) == 0 {
 			return Settings{}, fmt.Errorf("缺少代理应用预置名单，请先更新预置名单")
 		}
 	}
@@ -106,24 +106,27 @@ func ReplaceForceAppList(layout *paths.Layout, kind string, apps []string) (Sett
 	return ReadSettings(layout), nil
 }
 
-func ReplaceAppList(layout *paths.Layout, mode string, apps []string) (Settings, error) {
-	if mode != "whitelist" && mode != "blacklist" {
-		return Settings{}, fmt.Errorf("不支持的应用名单模式: %s", mode)
-	}
+func ReplaceAppList(layout *paths.Layout, kind string, apps []string) (Settings, error) {
 	clean := uniqueApps(apps)
 	for _, app := range clean {
 		if !validPackageName(app) {
 			return Settings{}, fmt.Errorf("无效包名: %s", app)
 		}
 	}
-	key := "proxy_apps_list"
-	if mode == "blacklist" {
-		key = "bypass_apps_list"
+	file := layout.ProxyApps()
+	if kind == "bypass" {
+		file = layout.BypassApps()
+	} else if kind != "proxy" {
+		return Settings{}, fmt.Errorf("不支持的基础应用名单: %s", kind)
 	}
-	if err := writeConfigValues(layout.ConfigFile(), map[string]configValue{
-		"app_proxy_mode": {value: mode, quote: true},
-		key:              {value: strings.Join(clean, " "), quote: true},
-	}); err != nil {
+	data := ""
+	if len(clean) > 0 {
+		data = strings.Join(clean, "\n") + "\n"
+	}
+	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+		return Settings{}, err
+	}
+	if err := atomicWriteFile(file, []byte(data), 0600); err != nil {
 		return Settings{}, err
 	}
 	return ReadSettings(layout), nil

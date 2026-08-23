@@ -17,14 +17,14 @@ func TestUpdateSettingRejectsUnsupportedValue(t *testing.T) {
 	if _, err := UpdateSetting(layout, "proxy_mode", "invalid"); err == nil {
 		t.Fatal("UpdateSetting accepted an invalid proxy mode")
 	}
-	if _, err := UpdateSetting(layout, "auto_proxy_apps_enable", "1"); err == nil {
+	if _, err := UpdateSetting(layout, "auto_mode", "1"); err == nil {
 		t.Fatal("UpdateSetting enabled automatic lists without a catalogue")
 	}
 	if err := os.WriteFile(layout.ProxyPackageList(), []byte("com.example.proxy\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	settings, err := UpdateSetting(layout, "auto_proxy_apps_enable", "1")
-	if err != nil || !settings.AutoProxyAppsEnable {
+	settings, err := UpdateSetting(layout, "auto_mode", "1")
+	if err != nil || !settings.AutoMode {
 		t.Fatalf("automatic list setting = %#v, %v", settings, err)
 	}
 }
@@ -50,24 +50,24 @@ func TestReadSettingsUsesEmptyForceLists(t *testing.T) {
 	}
 }
 
-func TestReplaceAppListWritesActiveMode(t *testing.T) {
+func TestReplaceAppListWritesIndependentFile(t *testing.T) {
 	layout := testSettingsLayout(t)
 	if _, err := UpdateSetting(layout, "app_proxy_enable", "0"); err != nil {
 		t.Fatal(err)
 	}
-	settings, err := ReplaceAppList(layout, "whitelist", []string{"com.example.one", "com.example.one", "io.demo.two"})
+	settings, err := ReplaceAppList(layout, "proxy", []string{"com.example.one", "com.example.one", "io.demo.two"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if settings.AppProxyEnable || settings.AppProxyMode != "whitelist" || len(settings.ProxyApps) != 2 {
+	if settings.AppProxyEnable || settings.AppProxyMode != "blacklist" || len(settings.ProxyApps) != 2 {
 		t.Fatalf("settings = %#v", settings)
 	}
-	if _, err := ReplaceAppList(layout, "whitelist", []string{"not a package"}); err == nil {
+	if _, err := ReplaceAppList(layout, "proxy", []string{"not a package"}); err == nil {
 		t.Fatal("ReplaceAppList accepted an invalid package")
 	}
-	data, err := os.ReadFile(layout.ConfigFile())
-	if err != nil || !strings.Contains(string(data), "advanced_setting=keep") {
-		t.Fatalf("advanced setting was not preserved: %v, %s", err, data)
+	data, err := os.ReadFile(layout.ProxyApps())
+	if err != nil || string(data) != "com.example.one\nio.demo.two\n" {
+		t.Fatalf("proxy list = %q, %v", data, err)
 	}
 }
 
@@ -78,7 +78,7 @@ func testSettingsLayout(t *testing.T) *paths.Layout {
 	if err := os.MkdirAll(layout.ConfigDir(), 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "fluxnet.config"), []byte("# keep comments\nadvanced_setting=keep\nautostart=1\nproxy_mode=tun\ntun_stack=gvisor\nauto_redirect=0\ntun_forward=0\napp_proxy_enable=0\napp_proxy_mode=blacklist\nauto_proxy_apps_enable=0\nproxy_apps_list=\"\"\nbypass_apps_list=\"\"\n"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "fluxnet.config"), []byte("# keep comments\nadvanced_setting=keep\nautostart=1\nproxy_mode=tun\ntun_stack=gvisor\nauto_redirect=0\ntun_forward=0\napp_proxy_enable=0\napp_proxy_mode=blacklist\nauto_mode=0\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	return layout

@@ -82,7 +82,7 @@ func usage() {
   subscription add|update|list|remove|switch  订阅管理
   worker start|stop                  后台 Worker
   health                             健康检查
-	app-list update|show|upgrade|installed  应用名单管理
+	app-list show|catalog|upgrade|replace|force-replace  应用名单管理
   version                            版本信息
   help                               帮助
 
@@ -340,21 +340,19 @@ func cmdWorker(layout *paths.Layout, args []string) {
 
 func cmdAppList(layout *paths.Layout, args []string) {
 	if len(args) == 0 {
-		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list update|show|upgrade|installed|replace|force-replace")
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list show|catalog|upgrade|replace|force-replace")
 		return
 	}
 	switch args[0] {
-	case "update":
-		app.Update(layout, jsonOutput)
 	case "show":
 		app.Show(layout, jsonOutput)
+	case "catalog":
+		app.Catalog(layout, jsonOutput)
 	case "upgrade":
 		app.Upgrade(layout, jsonOutput)
-	case "installed":
-		app.Installed(jsonOutput)
 	case "replace":
 		if len(args) != 3 {
-			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list replace <whitelist|blacklist> <base64-json>")
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list replace <proxy|bypass> <base64-json>")
 			return
 		}
 		app.Replace(layout, jsonOutput, args[1], args[2])
@@ -365,7 +363,7 @@ func cmdAppList(layout *paths.Layout, args []string) {
 		}
 		app.ReplaceForce(layout, jsonOutput, args[1], args[2])
 	default:
-		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list update|show|upgrade|installed|replace|force-replace")
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list show|catalog|upgrade|replace|force-replace")
 	}
 }
 

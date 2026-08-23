@@ -18,7 +18,10 @@ func TestApplyRuntimeInjectsAtpAppLists(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "fluxnet.config"), []byte("proxy_mode=redirect\napp_proxy_enable=1\napp_proxy_mode=blacklist\nbypass_apps_list=\"com.example.manual\"\n"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "fluxnet.config"), []byte("proxy_mode=redirect\napp_proxy_enable=1\napp_proxy_mode=blacklist\nauto_mode=0\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(layout.BypassApps(), []byte("com.example.manual\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(layout.InboundTemplate("redirect"), []byte(`{"type":"redirect","tag":"redirect-in"}`), 0600); err != nil {
@@ -28,9 +31,6 @@ func TestApplyRuntimeInjectsAtpAppLists(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(layout.ForceProxyApps(), []byte("com.example.force-proxy\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(layout.ForceBypassApps(), []byte("com.example.bypass\ncom.example.force-proxy\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(layout.AtpBin(), []byte("#!/bin/sh\necho atp-start\n"), 0755); err != nil {
@@ -49,7 +49,7 @@ func TestApplyRuntimeInjectsAtpAppLists(t *testing.T) {
 		`APP_PROXY_ENABLE=1`,
 		`APP_PROXY_MODE="blacklist"`,
 		`PROXY_APPS_LIST=""`,
-		`BYPASS_APPS_LIST="com.example.manual com.example.bypass"`,
+		`BYPASS_APPS_LIST="com.example.manual"`,
 		`PROXY_MODE=2`,
 	} {
 		if !strings.Contains(got, want) {
@@ -125,10 +125,10 @@ func TestTemplateAppProxyUsesConfiguredMode(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "fluxnet.config"), []byte("app_proxy_enable=1\napp_proxy_mode=whitelist\nproxy_apps_list=\"com.example.manual com.example.bypass\"\n"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "fluxnet.config"), []byte("app_proxy_enable=1\napp_proxy_mode=whitelist\nauto_mode=0\nproxy_apps_list=\"com.example.legacy\"\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(layout.ForceProxyApps(), []byte("com.example.force\n"), 0600); err != nil {
+	if err := os.WriteFile(layout.ProxyApps(), []byte("com.example.manual\ncom.example.bypass\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(layout.ForceBypassApps(), []byte("com.example.bypass\n"), 0600); err != nil {
@@ -163,13 +163,13 @@ func TestTemplateAppProxyUsesConfiguredMode(t *testing.T) {
 			t.Errorf("%s retained exclude_package in whitelist mode", mode)
 		}
 		got := inbound["include_package"].([]any)
-		if len(got) != 2 || got[0] != "com.example.manual" || got[1] != "com.example.force" {
+		if len(got) != 2 || got[0] != "com.example.manual" || got[1] != "com.example.bypass" {
 			t.Errorf("%s include_package = %#v", mode, got)
 		}
 	}
 }
 
-func TestEffectiveAppProxyUsesForceBypassWhenDisabled(t *testing.T) {
+func TestEffectiveAppProxyIgnoresForceListsOutsideAutoMode(t *testing.T) {
 	root := t.TempDir()
 	layout := paths.New(filepath.Join(root, "module"), filepath.Join(root, "data"))
 	if err := os.MkdirAll(layout.ConfigDir(), 0755); err != nil {
@@ -185,7 +185,49 @@ func TestEffectiveAppProxyUsesForceBypassWhenDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !apps.enabled || apps.mode != "blacklist" || len(apps.bypassApps) != 1 || apps.bypassApps[0] != "com.example.bypass" {
+	if apps.enabled || apps.mode != "whitelist" || len(apps.proxyApps) != 0 || len(apps.bypassApps) != 0 {
 		t.Errorf("effective app proxy = %#v", apps)
+	}
+}
+
+func TestEffectiveAppProxyAutoModeUsesReverseForceLists(t *testing.T) {
+	root := t.TempDir()
+	layout := paths.New(filepath.Join(root, "module"), filepath.Join(root, "data"))
+	if err := os.MkdirAll(layout.ConfigDir(), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(layout.ProxyApps(), []byte("com.example.proxy\ncom.example.bypass\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(layout.BypassApps(), []byte("com.example.bypass\ncom.example.proxy\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(layout.ForceProxyApps(), []byte("com.example.proxy\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(layout.ForceBypassApps(), []byte("com.example.bypass\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		mode string
+		want []string
+	}{
+		{mode: "whitelist", want: []string{"com.example.proxy"}},
+		{mode: "blacklist", want: []string{"com.example.bypass"}},
+	} {
+		if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "fluxnet.config"), []byte("app_proxy_enable=1\napp_proxy_mode="+tc.mode+"\nauto_mode=1\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		apps, err := effectiveAppProxy(layout)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := apps.proxyApps
+		if tc.mode == "blacklist" {
+			got = apps.bypassApps
+		}
+		if strings.Join(got, " ") != strings.Join(tc.want, " ") {
+			t.Errorf("%s apps = %#v, want %#v", tc.mode, got, tc.want)
+		}
 	}
 }
