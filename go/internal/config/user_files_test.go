@@ -8,7 +8,7 @@ import (
 	"github.com/Delusions6515/FluxNet/internal/paths"
 )
 
-func TestReadUserInboundCopiesTemplate(t *testing.T) {
+func TestReadUserInboundReturnsTemplateWithoutCreatingOverride(t *testing.T) {
 	root := t.TempDir()
 	layout := paths.New(filepath.Join(root, "module"), filepath.Join(root, "data"))
 	if err := os.MkdirAll(layout.InboundTemplateDir(), 0755); err != nil {
@@ -22,9 +22,27 @@ func TestReadUserInboundCopiesTemplate(t *testing.T) {
 	if err != nil || content != template {
 		t.Fatalf("ReadUserInbound = %q, %v", content, err)
 	}
-	data, err := os.ReadFile(layout.UserInbound("tun"))
-	if err != nil || string(data) != template {
-		t.Fatalf("user inbound = %q, %v", data, err)
+	if _, err := os.Stat(layout.UserInbound("tun")); !os.IsNotExist(err) {
+		t.Fatalf("user inbound override exists after read: %v", err)
+	}
+}
+
+func TestReadUserInboundPrefersUserOverride(t *testing.T) {
+	root := t.TempDir()
+	layout := paths.New(filepath.Join(root, "module"), filepath.Join(root, "data"))
+	if err := os.MkdirAll(layout.InboundTemplateDir(), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(layout.InboundTemplate("tun"), []byte(`{"type":"tun","tag":"template"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	const override = `{"type":"tun","tag":"override"}`
+	if err := WriteUserInbound(layout, "tun", []byte(override)); err != nil {
+		t.Fatal(err)
+	}
+	content, err := ReadUserInbound(layout, "tun")
+	if err != nil || content != override {
+		t.Fatalf("ReadUserInbound = %q, %v", content, err)
 	}
 }
 

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/Delusions6515/FluxNet/internal/paths"
 )
@@ -28,12 +27,6 @@ func ReadUserInbound(layout *paths.Layout, mode string) (string, error) {
 	}
 	if err := validateInbound(data); err != nil {
 		return "", fmt.Errorf("入站模板无效: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(userFile), 0755); err != nil {
-		return "", err
-	}
-	if err := atomicWriteFile(userFile, data, 0600); err != nil {
-		return "", err
 	}
 	return string(data), nil
 }

@@ -44,7 +44,7 @@ const upgrading = ref(false);
 const generatingApps = ref(false);
 const loadingApps = ref(false);
 const tab = ref(0);
-const editorVisited = ref(true);
+const configEditorTarget = ref("");
 const appListEditorOpen = ref(false);
 const modes = ["tun", "tproxy", "redirect", "ebpf"];
 const appModes = ["blacklist", "whitelist"];
@@ -112,6 +112,9 @@ function currentSelection(nextSettings = settings.value) {
 function syncSelection(nextSettings = settings.value) {
   selected.value = currentSelection(nextSettings);
   pinned.value = [...selected.value];
+}
+function openConfigEditor(target) {
+  configEditorTarget.value = target;
 }
 async function load() {
   try {
@@ -205,156 +208,184 @@ async function upgradeApps() {
   }
 }
 
-watch(tab, (value) => {
-  if (value === 0) editorVisited.value = true;
-});
 onMounted(load);
 onActivated(load);
 </script>
 
 <template>
   <div class="page">
-    <MiuixCard class="section section--compact proxy-tabs">
-      <MiuixTabRow
-        v-model="tab"
-        :tabs="['普通设置', '分应用代理设置']"
-        contour
-      />
-    </MiuixCard>
+    <div v-if="configEditorTarget" class="editor-page">
+      <div class="section page-actions">
+        <MiuixButton type="secondary" @click="configEditorTarget = ''">
+          返回普通代理设置
+        </MiuixButton>
+      </div>
+      <Suspense>
+        <template #default>
+          <ConfigEditor
+            :key="configEditorTarget"
+            :target="configEditorTarget"
+            :mode="settings?.proxy_mode"
+          />
+        </template>
+        <template #fallback>
+          <MiuixCard class="section editor-loading">
+            <MiuixText type="body2" class="muted">正在加载编辑器…</MiuixText>
+          </MiuixCard>
+        </template>
+      </Suspense>
+    </div>
 
-    <div v-show="tab === 0">
-      <MiuixSmallTitle text="代理模式" />
-      <MiuixCard class="section section--compact">
-        <MiuixDropdownPreference
-          v-model="modeIndex"
-          title="代理模式"
-          :items="modes"
+    <div v-else>
+      <MiuixCard class="section section--compact proxy-tabs">
+        <MiuixTabRow
+          v-model="tab"
+          :tabs="['普通设置', '分应用代理设置']"
+          contour
         />
       </MiuixCard>
-      <template v-if="isTun">
-        <MiuixSmallTitle text="Tun 设置" />
+
+      <div v-show="tab === 0">
+        <MiuixSmallTitle text="代理模式" />
         <MiuixCard class="section section--compact">
           <MiuixDropdownPreference
-            v-model="tunStackIndex"
-            title="协议栈"
-            :items="['system', 'gvisor', 'mixed']"
+            v-model="modeIndex"
+            title="代理模式"
+            :items="modes"
           />
+        </MiuixCard>
+        <template v-if="isTun">
+          <MiuixSmallTitle text="Tun 设置" />
+          <MiuixCard class="section section--compact">
+            <MiuixDropdownPreference
+              v-model="tunStackIndex"
+              title="协议栈"
+              :items="['system', 'gvisor', 'mixed']"
+            />
+            <MiuixSwitchPreference
+              :model-value="settings?.auto_redirect"
+              title="自动重定向"
+              @update:model-value="
+                (value) => saveSetting('auto_redirect', value ? '1' : '0')
+              "
+            />
+            <MiuixSwitchPreference
+              :model-value="settings?.tun_forward"
+              title="热点共享转发"
+              @update:model-value="
+                (value) => saveSetting('tun_forward', value ? '1' : '0')
+              "
+            />
+          </MiuixCard>
+        </template>
+        <MiuixCard v-if="settings" class="section">
+          <div class="page-actions">
+            <MiuixButton @click="openConfigEditor('inbound')">
+              编辑当前入站
+            </MiuixButton>
+            <MiuixButton
+              v-if="usesTproxy"
+              type="secondary"
+              @click="openConfigEditor('tproxy')"
+            >
+              编辑 tproxy.conf
+            </MiuixButton>
+          </div>
+        </MiuixCard>
+      </div>
+
+      <div v-show="tab === 1 && appListEditorOpen" class="editor-page">
+        <div class="section page-actions">
+          <MiuixButton type="secondary" @click="appListEditorOpen = false">
+            返回分应用代理设置
+          </MiuixButton>
+        </div>
+        <MiuixSmallTitle :text="appListTitle" />
+        <MiuixCard class="section">
+          <MiuixInput v-model="query" label="搜索已安装应用" />
+          <div class="app-list">
+            <button
+              v-for="app in visibleApps"
+              :key="app.packageName"
+              class="app-row"
+              :class="{ selected: selected.includes(app.packageName) }"
+              @click="toggle(app.packageName)"
+            >
+              <img
+                class="app-row__icon"
+                :src="`ksu://icon/${app.packageName}`"
+                alt=""
+                @error="
+                  (event) => {
+                    event.target.style.display = 'none';
+                  }
+                "
+              />
+              <span>
+                <strong>{{ app.appLabel }}</strong>
+                <small>{{ app.packageName }}</small>
+              </span>
+              <b>{{ selected.includes(app.packageName) ? "已选" : "" }}</b>
+            </button>
+          </div>
+          <div class="page-actions">
+            <MiuixButton
+              :disabled="savingApps || generatingApps"
+              @click="saveApps"
+            >
+              {{ savingApps ? "保存中…" : "保存应用名单" }}
+            </MiuixButton>
+          </div>
+        </MiuixCard>
+      </div>
+
+      <div v-show="tab === 1 && !appListEditorOpen">
+        <MiuixSmallTitle text="分应用代理" />
+        <MiuixCard class="section section--compact">
           <MiuixSwitchPreference
-            :model-value="settings?.auto_redirect"
-            title="自动重定向"
+            v-if="settings"
+            :model-value="settings.app_proxy_enable"
+            title="启用分应用代理"
             @update:model-value="
-              (value) => saveSetting('auto_redirect', value ? '1' : '0')
+              (value) => saveSetting('app_proxy_enable', value ? '1' : '0')
             "
           />
+          <MiuixDropdownPreference
+            v-model="appModeIndex"
+            title="规则模式"
+            :items="['绕过所选应用', '仅代理所选应用']"
+          />
           <MiuixSwitchPreference
-            :model-value="settings?.tun_forward"
-            title="热点共享转发"
+            v-if="settings"
+            :model-value="settings.auto_mode"
+            title="自动模式"
             @update:model-value="
-              (value) => saveSetting('tun_forward', value ? '1' : '0')
+              (value) => saveSetting('auto_mode', value ? '1' : '0')
             "
           />
         </MiuixCard>
-      </template>
-      <ConfigEditor
-        v-if="editorVisited && settings"
-        v-show="tab === 0"
-        target="inbound"
-        :mode="settings.proxy_mode"
-      />
-      <ConfigEditor v-if="usesTproxy" target="tproxy" />
-    </div>
-
-    <div v-show="tab === 1 && appListEditorOpen" class="editor-page">
-      <div class="section page-actions">
-        <MiuixButton type="secondary" @click="appListEditorOpen = false">
-          返回分应用代理设置
-        </MiuixButton>
+        <MiuixCard v-if="settings" class="section">
+          <div class="page-actions">
+            <MiuixButton
+              type="secondary"
+              :disabled="upgrading"
+              @click="upgradeApps"
+            >
+              {{ upgrading ? "更新中…" : "更新预置名单" }}
+            </MiuixButton>
+            <MiuixButton
+              type="secondary"
+              :disabled="generatingApps"
+              @click="generateApps"
+            >
+              {{ generatingApps ? "生成中…" : "从预置名单生成" }}
+            </MiuixButton>
+            <MiuixButton :disabled="loadingApps" @click="openAppListEditor">
+              {{ loadingApps ? "加载中…" : `编辑${appListTitle}` }}
+            </MiuixButton>
+          </div>
+        </MiuixCard>
       </div>
-      <MiuixSmallTitle :text="appListTitle" />
-      <MiuixCard class="section">
-        <MiuixInput v-model="query" label="搜索已安装应用" />
-        <div class="app-list">
-          <button
-            v-for="app in visibleApps"
-            :key="app.packageName"
-            class="app-row"
-            :class="{ selected: selected.includes(app.packageName) }"
-            @click="toggle(app.packageName)"
-          >
-            <img
-              class="app-row__icon"
-              :src="`ksu://icon/${app.packageName}`"
-              alt=""
-              @error="
-                (event) => {
-                  event.target.style.display = 'none';
-                }
-              "
-            />
-            <span>
-              <strong>{{ app.appLabel }}</strong>
-              <small>{{ app.packageName }}</small>
-            </span>
-            <b>{{ selected.includes(app.packageName) ? "已选" : "" }}</b>
-          </button>
-        </div>
-        <div class="page-actions">
-          <MiuixButton
-            :disabled="savingApps || generatingApps"
-            @click="saveApps"
-          >
-            {{ savingApps ? "保存中…" : "保存应用名单" }}
-          </MiuixButton>
-        </div>
-      </MiuixCard>
-    </div>
-
-    <div v-show="tab === 1 && !appListEditorOpen">
-      <MiuixSmallTitle text="分应用代理" />
-      <MiuixCard class="section section--compact">
-        <MiuixSwitchPreference
-          v-if="settings"
-          :model-value="settings.app_proxy_enable"
-          title="启用分应用代理"
-          @update:model-value="
-            (value) => saveSetting('app_proxy_enable', value ? '1' : '0')
-          "
-        />
-        <MiuixDropdownPreference
-          v-model="appModeIndex"
-          title="规则模式"
-          :items="['绕过所选应用', '仅代理所选应用']"
-        />
-        <MiuixSwitchPreference
-          v-if="settings"
-          :model-value="settings.auto_mode"
-          title="自动模式"
-          @update:model-value="
-            (value) => saveSetting('auto_mode', value ? '1' : '0')
-          "
-        />
-      </MiuixCard>
-      <MiuixCard v-if="settings" class="section">
-        <div class="page-actions">
-          <MiuixButton
-            type="secondary"
-            :disabled="upgrading"
-            @click="upgradeApps"
-          >
-            {{ upgrading ? "更新中…" : "更新预置名单" }}
-          </MiuixButton>
-          <MiuixButton
-            type="secondary"
-            :disabled="generatingApps"
-            @click="generateApps"
-          >
-            {{ generatingApps ? "生成中…" : "从预置名单生成" }}
-          </MiuixButton>
-          <MiuixButton :disabled="loadingApps" @click="openAppListEditor">
-            {{ loadingApps ? "加载中…" : `编辑${appListTitle}` }}
-          </MiuixButton>
-        </div>
-      </MiuixCard>
     </div>
     <MiuixText v-if="error" class="section error" type="body2">
       {{ error }}
