@@ -20,8 +20,11 @@ import {
 } from "miuix-vue";
 import {
   getInstalledApps,
+  getProxyPackageCatalog,
   getSettings,
+  partitionInstalledApps,
   replaceAppList,
+  replaceAppLists,
   replaceForceAppList,
   setSetting,
   upgradeProxyPackageList,
@@ -38,8 +41,11 @@ const pinned = ref([]);
 const error = ref("");
 const savingApps = ref(false);
 const upgrading = ref(false);
+const generatingApps = ref(false);
+const loadingApps = ref(false);
 const tab = ref(0);
 const editorVisited = ref(true);
+const appListEditorOpen = ref(false);
 const modes = ["tun", "tproxy", "redirect", "ebpf"];
 const appModes = ["blacklist", "whitelist"];
 const modeIndex = computed({
@@ -63,10 +69,17 @@ const isTun = computed(() => settings.value?.proxy_mode === "tun");
 const usesTproxy = computed(() =>
   ["tproxy", "redirect"].includes(settings.value?.proxy_mode),
 );
-const automaticApps = computed(() => settings.value?.auto_proxy_apps_enable);
-const forceKind = computed(() =>
-  settings.value?.app_proxy_mode === "whitelist" ? "proxy" : "bypass",
-);
+const automaticApps = computed(() => settings.value?.auto_mode);
+const appListKind = computed(() => {
+  if (automaticApps.value)
+    return settings.value?.app_proxy_mode === "whitelist" ? "bypass" : "proxy";
+  return settings.value?.app_proxy_mode === "whitelist" ? "proxy" : "bypass";
+});
+const appListTitle = computed(() => {
+  if (automaticApps.value)
+    return appListKind.value === "proxy" ? "强制代理名单" : "强制绕过名单";
+  return appListKind.value === "proxy" ? "代理应用名单" : "绕过应用名单";
+});
 const visibleApps = computed(() =>
   apps.value
     .filter((app) =>
@@ -86,36 +99,46 @@ function showError(err) {
 }
 function currentSelection(nextSettings = settings.value) {
   if (!nextSettings) return [];
-  if (nextSettings.auto_proxy_apps_enable)
-    return [
-      ...(nextSettings.app_proxy_mode === "whitelist"
-        ? nextSettings.force_proxy_apps
-        : nextSettings.force_bypass_apps),
-    ];
-  return [
-    ...(nextSettings.app_proxy_mode === "whitelist"
-      ? nextSettings.proxy_apps
-      : nextSettings.bypass_apps),
-  ];
+  const kind = nextSettings.auto_mode
+    ? nextSettings.app_proxy_mode === "whitelist"
+      ? "bypass"
+      : "proxy"
+    : nextSettings.app_proxy_mode === "whitelist"
+      ? "proxy"
+      : "bypass";
+  const key = `${nextSettings.auto_mode ? "force_" : ""}${kind}_apps`;
+  return [...(nextSettings[key] || [])];
+}
+function syncSelection(nextSettings = settings.value) {
+  selected.value = currentSelection(nextSettings);
+  pinned.value = [...selected.value];
 }
 async function load() {
   try {
     settings.value = await getSettings();
-    selected.value = currentSelection();
-    pinned.value = [...selected.value];
-    apps.value = await getInstalledApps();
+    syncSelection();
   } catch (err) {
     error.value = err.message;
     showError(err);
   }
 }
+async function openAppListEditor() {
+  loadingApps.value = true;
+  try {
+    apps.value = await getInstalledApps();
+    query.value = "";
+    appListEditorOpen.value = true;
+  } catch (err) {
+    error.value = err.message;
+    showError(err);
+  } finally {
+    loadingApps.value = false;
+  }
+}
 async function saveSetting(key, value) {
   try {
     settings.value = await setSetting(key, value);
-    if (key === "app_proxy_mode" || key === "auto_proxy_apps_enable") {
-      selected.value = currentSelection();
-      pinned.value = [...selected.value];
-    }
+    if (key === "app_proxy_mode" || key === "auto_mode") syncSelection();
     showSnackbar({
       message: "设置已保存，等待手动应用配置",
       withDismissAction: true,
@@ -134,8 +157,8 @@ async function saveApps() {
   savingApps.value = true;
   try {
     settings.value = automaticApps.value
-      ? await replaceForceAppList(forceKind.value, selected.value)
-      : await replaceAppList(settings.value.app_proxy_mode, selected.value);
+      ? await replaceForceAppList(appListKind.value, selected.value)
+      : await replaceAppList(appListKind.value, selected.value);
     pinned.value = [...selected.value];
     showSnackbar({
       message: "应用名单已保存，等待手动应用配置",
@@ -146,6 +169,27 @@ async function saveApps() {
     showError(err);
   } finally {
     savingApps.value = false;
+  }
+}
+async function generateApps() {
+  generatingApps.value = true;
+  try {
+    const [catalog, installedApps] = await Promise.all([
+      getProxyPackageCatalog(),
+      getInstalledApps(),
+    ]);
+    const { proxyApps, bypassApps } = partitionInstalledApps(
+      catalog.packages || [],
+      installedApps,
+    );
+    settings.value = await replaceAppLists(proxyApps, bypassApps);
+    syncSelection();
+    showSnackbar({ message: "应用名单已生成", withDismissAction: true });
+  } catch (err) {
+    error.value = err.message;
+    showError(err);
+  } finally {
+    generatingApps.value = false;
   }
 }
 async function upgradeApps() {
@@ -171,7 +215,11 @@ onActivated(load);
 <template>
   <div class="page">
     <MiuixCard class="section section--compact proxy-tabs">
-      <MiuixTabRow v-model="tab" :tabs="['普通代理', '分应用代理']" contour />
+      <MiuixTabRow
+        v-model="tab"
+        :tabs="['普通设置', '分应用代理设置']"
+        contour
+      />
     </MiuixCard>
 
     <div v-show="tab === 0">
@@ -216,49 +264,13 @@ onActivated(load);
       <ConfigEditor v-if="usesTproxy" target="tproxy" />
     </div>
 
-    <div v-show="tab === 1">
-      <MiuixSmallTitle text="分应用代理" />
-      <MiuixCard class="section section--compact">
-        <MiuixSwitchPreference
-          v-if="settings"
-          :model-value="settings.app_proxy_enable"
-          title="启用分应用代理"
-          @update:model-value="
-            (value) => saveSetting('app_proxy_enable', value ? '1' : '0')
-          "
-        />
-        <MiuixDropdownPreference
-          v-model="appModeIndex"
-          title="规则模式"
-          :items="['绕过所选应用', '仅代理所选应用']"
-        />
-        <MiuixSwitchPreference
-          v-if="settings"
-          :model-value="settings.auto_proxy_apps_enable"
-          title="自动生成代理/绕过名单"
-          @update:model-value="
-            (value) => saveSetting('auto_proxy_apps_enable', value ? '1' : '0')
-          "
-        />
-      </MiuixCard>
-      <MiuixCard v-if="settings" class="section">
-        <div class="page-actions">
-          <MiuixButton
-            type="secondary"
-            :disabled="upgrading"
-            @click="upgradeApps"
-          >
-            {{ upgrading ? "更新中…" : "更新预置名单" }}
-          </MiuixButton>
-        </div>
-      </MiuixCard>
-      <MiuixSmallTitle
-        :text="
-          automaticApps
-            ? `强制${forceKind === 'proxy' ? '代理' : '绕过'}名单`
-            : '应用名单'
-        "
-      />
+    <div v-show="tab === 1 && appListEditorOpen" class="editor-page">
+      <div class="section page-actions">
+        <MiuixButton type="secondary" @click="appListEditorOpen = false">
+          返回分应用代理设置
+        </MiuixButton>
+      </div>
+      <MiuixSmallTitle :text="appListTitle" />
       <MiuixCard class="section">
         <MiuixInput v-model="query" label="搜索已安装应用" />
         <div class="app-list">
@@ -287,8 +299,59 @@ onActivated(load);
           </button>
         </div>
         <div class="page-actions">
-          <MiuixButton :disabled="savingApps" @click="saveApps">
+          <MiuixButton
+            :disabled="savingApps || generatingApps"
+            @click="saveApps"
+          >
             {{ savingApps ? "保存中…" : "保存应用名单" }}
+          </MiuixButton>
+        </div>
+      </MiuixCard>
+    </div>
+
+    <div v-show="tab === 1 && !appListEditorOpen">
+      <MiuixSmallTitle text="分应用代理" />
+      <MiuixCard class="section section--compact">
+        <MiuixSwitchPreference
+          v-if="settings"
+          :model-value="settings.app_proxy_enable"
+          title="启用分应用代理"
+          @update:model-value="
+            (value) => saveSetting('app_proxy_enable', value ? '1' : '0')
+          "
+        />
+        <MiuixDropdownPreference
+          v-model="appModeIndex"
+          title="规则模式"
+          :items="['绕过所选应用', '仅代理所选应用']"
+        />
+        <MiuixSwitchPreference
+          v-if="settings"
+          :model-value="settings.auto_mode"
+          title="自动模式"
+          @update:model-value="
+            (value) => saveSetting('auto_mode', value ? '1' : '0')
+          "
+        />
+      </MiuixCard>
+      <MiuixCard v-if="settings" class="section">
+        <div class="page-actions">
+          <MiuixButton
+            type="secondary"
+            :disabled="upgrading"
+            @click="upgradeApps"
+          >
+            {{ upgrading ? "更新中…" : "更新预置名单" }}
+          </MiuixButton>
+          <MiuixButton
+            type="secondary"
+            :disabled="generatingApps"
+            @click="generateApps"
+          >
+            {{ generatingApps ? "生成中…" : "从预置名单生成" }}
+          </MiuixButton>
+          <MiuixButton :disabled="loadingApps" @click="openAppListEditor">
+            {{ loadingApps ? "加载中…" : `编辑${appListTitle}` }}
           </MiuixButton>
         </div>
       </MiuixCard>
@@ -300,6 +363,11 @@ onActivated(load);
 </template>
 
 <style scoped>
+.editor-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 .app-list {
   max-height: 360px;
   overflow: auto;

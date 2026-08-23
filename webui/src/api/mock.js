@@ -12,7 +12,7 @@ const state = {
     proxy_mode: "tun",
     app_proxy_enable: false,
     app_proxy_mode: "blacklist",
-    auto_proxy_apps_enable: false,
+    auto_mode: false,
     tun_stack: "gvisor",
     auto_redirect: false,
     tun_forward: false,
@@ -90,10 +90,14 @@ export function mockGateway(command, args = []) {
         state.health.mode = args[1];
       }
       return result("config.updated", "设置已保存", state.settings);
-    case "app-list-replace":
-      state.settings.app_proxy_mode = args[0];
-      state.settings[args[0] === "whitelist" ? "proxy_apps" : "bypass_apps"] =
-        JSON.parse(atob(args[1]));
+    case "app-list-replace": {
+      const key = args[0] === "proxy" ? "proxy_apps" : "bypass_apps";
+      state.settings[key] = JSON.parse(atob(args[1]));
+      return result("app.replaced", "应用名单已保存", state.settings);
+    }
+    case "app-list-replace-both":
+      state.settings.proxy_apps = JSON.parse(atob(args[0]));
+      state.settings.bypass_apps = JSON.parse(atob(args[1]));
       return result("app.replaced", "应用名单已保存", state.settings);
     case "app-list-force-replace": {
       const key =
@@ -103,8 +107,10 @@ export function mockGateway(command, args = []) {
     }
     case "app-list-upgrade":
       return result("app.upgraded", "预置名单已更新");
-    case "app-list-installed":
-      return result("app.installed", "已安装应用", { apps: MOCK_PACKAGES });
+    case "app-list-catalog":
+      return result("app.catalog", "预置名单", {
+        packages: ["com.google.android.youtube", "org.telegram.messenger"],
+      });
     case "config-inbound-read":
       return result("config.inbound", "用户入站", {
         content: state.inbounds[args[0]],

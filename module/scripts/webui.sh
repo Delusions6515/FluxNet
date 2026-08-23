@@ -58,6 +58,10 @@ case "$command" in
     [ "$#" = 3 ] || exit 2
     exec "$FLUXNET" --json app-list replace "$2" "$3"
     ;;
+  app-list-replace-both)
+    [ "$#" = 3 ] || exit 2
+    exec "$FLUXNET" --json app-list replace-both "$2" "$3"
+    ;;
   app-list-force-replace)
     [ "$#" = 3 ] || exit 2
     exec "$FLUXNET" --json app-list force-replace "$2" "$3"

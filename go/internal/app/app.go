@@ -68,14 +68,9 @@ func Upgrade(layout *paths.Layout, jsonFormat bool) {
 // Replace updates the user-managed application list used by the WebUI.
 // The list is base64-encoded JSON so package names never become shell syntax.
 func Replace(layout *paths.Layout, jsonFormat bool, mode, encoded string) {
-	data, err := base64.StdEncoding.DecodeString(encoded)
+	apps, err := decodeAppList(encoded)
 	if err != nil {
-		result.Err(jsonFormat, "app.invalid_input", "应用名单编码无效")
-		return
-	}
-	var apps []string
-	if err := json.Unmarshal(data, &apps); err != nil {
-		result.Err(jsonFormat, "app.invalid_input", "应用名单必须是 JSON 数组")
+		result.Err(jsonFormat, "app.invalid_input", err.Error())
 		return
 	}
 	settings, err := config.ReplaceAppList(layout, mode, apps)
@@ -86,16 +81,31 @@ func Replace(layout *paths.Layout, jsonFormat bool, mode, encoded string) {
 	result.Text(result.Success("app.replaced", "应用名单已保存", settings), jsonFormat)
 }
 
-// ReplaceForce updates one user-managed force list.
-func ReplaceForce(layout *paths.Layout, jsonFormat bool, kind, encoded string) {
-	data, err := base64.StdEncoding.DecodeString(encoded)
+// ReplaceBoth updates the proxy and bypass base lists after validating both.
+func ReplaceBoth(layout *paths.Layout, jsonFormat bool, encodedProxy, encodedBypass string) {
+	proxyApps, err := decodeAppList(encodedProxy)
 	if err != nil {
-		result.Err(jsonFormat, "app.invalid_input", "应用名单编码无效")
+		result.Err(jsonFormat, "app.invalid_input", err.Error())
 		return
 	}
-	var apps []string
-	if err := json.Unmarshal(data, &apps); err != nil {
-		result.Err(jsonFormat, "app.invalid_input", "应用名单必须是 JSON 数组")
+	bypassApps, err := decodeAppList(encodedBypass)
+	if err != nil {
+		result.Err(jsonFormat, "app.invalid_input", err.Error())
+		return
+	}
+	settings, err := config.ReplaceAppLists(layout, proxyApps, bypassApps)
+	if err != nil {
+		result.Err(jsonFormat, "app.write_failed", err.Error())
+		return
+	}
+	result.Text(result.Success("app.replaced", "应用名单已保存", settings), jsonFormat)
+}
+
+// ReplaceForce updates one user-managed force list.
+func ReplaceForce(layout *paths.Layout, jsonFormat bool, kind, encoded string) {
+	apps, err := decodeAppList(encoded)
+	if err != nil {
+		result.Err(jsonFormat, "app.invalid_input", err.Error())
 		return
 	}
 	settings, err := config.ReplaceForceAppList(layout, kind, apps)
@@ -104,4 +114,16 @@ func ReplaceForce(layout *paths.Layout, jsonFormat bool, kind, encoded string) {
 		return
 	}
 	result.Text(result.Success("app.force_replaced", "强制应用名单已保存", settings), jsonFormat)
+}
+
+func decodeAppList(encoded string) ([]string, error) {
+	data, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, fmt.Errorf("应用名单编码无效")
+	}
+	var apps []string
+	if err := json.Unmarshal(data, &apps); err != nil {
+		return nil, fmt.Errorf("应用名单必须是 JSON 数组")
+	}
+	return apps, nil
 }

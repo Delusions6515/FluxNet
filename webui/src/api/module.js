@@ -1,4 +1,10 @@
-import { enableEdgeToEdge, exec, moduleInfo } from "kernelsu";
+import {
+  enableEdgeToEdge,
+  exec,
+  getPackagesInfo,
+  listPackages,
+  moduleInfo,
+} from "kernelsu";
 import { MOCK_PACKAGES, mockGateway } from "./mock";
 
 export const isBrowserDev = typeof window !== "undefined" && !window.ksu;
@@ -68,7 +74,13 @@ export const replaceAppList = (mode, apps) =>
   gateway("app-list-replace", [mode, encode(JSON.stringify(apps))]);
 export const replaceForceAppList = (kind, apps) =>
   gateway("app-list-force-replace", [kind, encode(JSON.stringify(apps))]);
+export const replaceAppLists = (proxyApps, bypassApps) =>
+  gateway("app-list-replace-both", [
+    encode(JSON.stringify(proxyApps)),
+    encode(JSON.stringify(bypassApps)),
+  ]);
 export const upgradeProxyPackageList = () => gateway("app-list-upgrade");
+export const getProxyPackageCatalog = () => gateway("app-list-catalog");
 export const readUserInbound = (mode) => gateway("config-inbound-read", [mode]);
 export const writeUserInbound = (mode, content) =>
   gateway("config-inbound-write", [mode, encode(content)]);
@@ -93,8 +105,28 @@ export function serviceAction(action) {
   return gateway(`service-${action}`);
 }
 
+export function partitionInstalledApps(catalog, installedApps) {
+  const proxyPackages = new Set(catalog);
+  return installedApps.reduce(
+    (lists, app) => {
+      lists[
+        proxyPackages.has(app.packageName) ? "proxyApps" : "bypassApps"
+      ].push(app.packageName);
+      return lists;
+    },
+    { proxyApps: [], bypassApps: [] },
+  );
+}
+
 export async function getInstalledApps() {
   if (isBrowserDev) return MOCK_PACKAGES;
-  const data = await gateway("app-list-installed");
-  return data.apps || [];
+  const packages = listPackages("all");
+  if (!packages.length) throw new Error("无法通过 KernelSU 获取已安装应用");
+  const labels = new Map(
+    getPackagesInfo(packages).map((item) => [item.packageName, item.appLabel]),
+  );
+  return packages.map((packageName) => ({
+    packageName,
+    appLabel: labels.get(packageName) || packageName,
+  }));
 }

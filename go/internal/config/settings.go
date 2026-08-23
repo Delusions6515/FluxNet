@@ -107,29 +107,87 @@ func ReplaceForceAppList(layout *paths.Layout, kind string, apps []string) (Sett
 }
 
 func ReplaceAppList(layout *paths.Layout, kind string, apps []string) (Settings, error) {
-	clean := uniqueApps(apps)
-	for _, app := range clean {
-		if !validPackageName(app) {
-			return Settings{}, fmt.Errorf("无效包名: %s", app)
-		}
-	}
 	file := layout.ProxyApps()
 	if kind == "bypass" {
 		file = layout.BypassApps()
 	} else if kind != "proxy" {
 		return Settings{}, fmt.Errorf("不支持的基础应用名单: %s", kind)
 	}
-	data := ""
-	if len(clean) > 0 {
-		data = strings.Join(clean, "\n") + "\n"
-	}
-	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
-		return Settings{}, err
-	}
-	if err := atomicWriteFile(file, []byte(data), 0600); err != nil {
+	if err := writeAppList(file, apps); err != nil {
 		return Settings{}, err
 	}
 	return ReadSettings(layout), nil
+}
+
+// ReplaceAppLists validates both base lists before writing either one.
+func ReplaceAppLists(layout *paths.Layout, proxyApps, bypassApps []string) (Settings, error) {
+	proxyData, err := appListData(proxyApps)
+	if err != nil {
+		return Settings{}, err
+	}
+	bypassData, err := appListData(bypassApps)
+	if err != nil {
+		return Settings{}, err
+	}
+	if err := os.MkdirAll(layout.ConfigDir(), 0755); err != nil {
+		return Settings{}, err
+	}
+	oldProxy, oldProxyExists, err := readOptionalFile(layout.ProxyApps())
+	if err != nil {
+		return Settings{}, err
+	}
+	if err := atomicWriteFile(layout.ProxyApps(), proxyData, 0600); err != nil {
+		return Settings{}, err
+	}
+	if err := atomicWriteFile(layout.BypassApps(), bypassData, 0600); err != nil {
+		if restoreErr := restoreOptionalFile(layout.ProxyApps(), oldProxy, oldProxyExists); restoreErr != nil {
+			return Settings{}, fmt.Errorf("写入绕过名单失败: %w；恢复代理名单失败: %v", err, restoreErr)
+		}
+		return Settings{}, err
+	}
+	return ReadSettings(layout), nil
+}
+
+func readOptionalFile(file string) ([]byte, bool, error) {
+	data, err := os.ReadFile(file)
+	if os.IsNotExist(err) {
+		return nil, false, nil
+	}
+	return data, err == nil, err
+}
+
+func restoreOptionalFile(file string, data []byte, exists bool) error {
+	if exists {
+		return atomicWriteFile(file, data, 0600)
+	}
+	if err := os.Remove(file); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func writeAppList(file string, apps []string) error {
+	data, err := appListData(apps)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
+		return err
+	}
+	return atomicWriteFile(file, data, 0600)
+}
+
+func appListData(apps []string) ([]byte, error) {
+	clean := uniqueApps(apps)
+	for _, app := range clean {
+		if !validPackageName(app) {
+			return nil, fmt.Errorf("无效包名: %s", app)
+		}
+	}
+	if len(clean) == 0 {
+		return []byte{}, nil
+	}
+	return []byte(strings.Join(clean, "\n") + "\n"), nil
 }
 
 type configValue struct {
