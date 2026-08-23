@@ -61,16 +61,16 @@ func normalizePackageList(content string) []string {
 				line = line[colon+1:]
 			}
 		}
-		for _, candidate := range strings.Fields(line) {
-			if !validPackageName(candidate) {
-				continue
-			}
-			if _, ok := seen[candidate]; ok {
-				continue
-			}
-			seen[candidate] = struct{}{}
-			packages = append(packages, candidate)
+		fields := strings.Fields(line)
+		if len(fields) != 1 || !validPackageName(fields[0]) {
+			continue
 		}
+		candidate := fields[0]
+		if _, ok := seen[candidate]; ok {
+			continue
+		}
+		seen[candidate] = struct{}{}
+		packages = append(packages, candidate)
 	}
 	return packages
 }

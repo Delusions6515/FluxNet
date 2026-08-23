@@ -268,9 +268,6 @@ func atomicWriteFile(file string, data []byte, mode os.FileMode) error {
 
 func validPackageName(name string) bool {
 	parts := strings.Split(name, ".")
-	if len(parts) < 2 {
-		return false
-	}
 	for _, part := range parts {
 		if part == "" {
 			return false
