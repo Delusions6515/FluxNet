@@ -94,7 +94,11 @@ func TestTemplateAppProxyEmptyListSerializesAsArray(t *testing.T) {
 			if err := os.WriteFile(layout.InboundTemplate(mode), []byte(template), 0600); err != nil {
 				t.Fatal(err)
 			}
-			data, err := NewTemplate(layout).Apply(mode)
+			apps, err := effectiveAppProxy(layout)
+			if err != nil {
+				t.Fatal(err)
+			}
+			data, err := NewTemplate(layout).Apply(mode, apps)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -105,8 +109,8 @@ func TestTemplateAppProxyEmptyListSerializesAsArray(t *testing.T) {
 			if mode == "ebpf" {
 				inbound = inbound["local"].(map[string]any)
 			}
-			apps, ok := inbound[appMode.field].([]any)
-			if !ok || len(apps) != 0 {
+			packages, ok := inbound[appMode.field].([]any)
+			if !ok || len(packages) != 0 {
 				t.Errorf("%s %s = %#v, want empty array", mode, appMode.field, inbound[appMode.field])
 			}
 		}
@@ -137,7 +141,11 @@ func TestTemplateAppProxyUsesConfiguredMode(t *testing.T) {
 		if err := os.WriteFile(layout.InboundTemplate(mode), []byte(template), 0600); err != nil {
 			t.Fatal(err)
 		}
-		data, err := NewTemplate(layout).Apply(mode)
+		apps, err := effectiveAppProxy(layout)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := NewTemplate(layout).Apply(mode, apps)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -173,7 +181,10 @@ func TestEffectiveAppProxyUsesForceBypassWhenDisabled(t *testing.T) {
 	if err := os.WriteFile(layout.ForceBypassApps(), []byte("com.example.bypass\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	apps := effectiveAppProxy(layout)
+	apps, err := effectiveAppProxy(layout)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !apps.enabled || apps.mode != "blacklist" || len(apps.bypassApps) != 1 || apps.bypassApps[0] != "com.example.bypass" {
 		t.Errorf("effective app proxy = %#v", apps)
 	}

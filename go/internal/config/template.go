@@ -21,7 +21,7 @@ func NewTemplate(layout *paths.Layout) *Template {
 
 // Apply reads the inbound template for the given mode, injects app lists and
 // mode-specific fields, and returns the assembled inbound as json.RawMessage.
-func (t *Template) Apply(mode string) (json.RawMessage, error) {
+func (t *Template) Apply(mode string, apps appProxySettings) (json.RawMessage, error) {
 	if mode != "tun" && mode != "tproxy" && mode != "redirect" && mode != "ebpf" {
 		return nil, fmt.Errorf("不支持的代理模式: %s", mode)
 	}
@@ -39,13 +39,13 @@ func (t *Template) Apply(mode string) (json.RawMessage, error) {
 
 	switch mode {
 	case "tun":
-		t.injectTun(inbound)
+		t.injectTun(inbound, apps)
 	case "tproxy":
 		t.injectTproxy(inbound)
 	case "redirect":
 		t.injectRedirect(inbound)
 	case "ebpf":
-		t.injectEbpf(inbound)
+		t.injectEbpf(inbound, apps)
 	}
 
 	result, err := json.Marshal(inbound)
@@ -57,8 +57,8 @@ func (t *Template) Apply(mode string) (json.RawMessage, error) {
 
 // ---- mode-specific injection ----
 
-func (t *Template) injectTun(inbound map[string]any) {
-	injectAppProxy(inbound, effectiveAppProxy(t.layout))
+func (t *Template) injectTun(inbound map[string]any, apps appProxySettings) {
+	injectAppProxy(inbound, apps)
 
 	// stack from fluxnet.config
 	cfg := readConfigKV(t.layout.ConfigFile())
@@ -86,9 +86,9 @@ func (t *Template) injectRedirect(inbound map[string]any) {
 	}
 }
 
-func (t *Template) injectEbpf(inbound map[string]any) {
+func (t *Template) injectEbpf(inbound map[string]any, apps appProxySettings) {
 	if local, ok := inbound["local"].(map[string]any); ok {
-		injectAppProxy(local, effectiveAppProxy(t.layout))
+		injectAppProxy(local, apps)
 	}
 }
 
@@ -99,7 +99,7 @@ type appProxySettings struct {
 	bypassApps []string
 }
 
-func effectiveAppProxy(layout *paths.Layout) appProxySettings {
+func effectiveAppProxy(layout *paths.Layout) (appProxySettings, error) {
 	cfg := readConfigKV(layout.ConfigFile())
 	mode := cfg["app_proxy_mode"]
 	if mode != "whitelist" && mode != "blacklist" {
@@ -109,19 +109,27 @@ func effectiveAppProxy(layout *paths.Layout) appProxySettings {
 	forceProxy := readAppList(layout.ForceProxyApps())
 	forceBypass := readAppList(layout.ForceBypassApps())
 	if cfg["app_proxy_enable"] != "1" && len(forceProxy) == 0 && len(forceBypass) == 0 {
-		return appProxySettings{mode: mode}
+		return appProxySettings{mode: mode}, nil
 	}
 	if cfg["app_proxy_enable"] != "1" {
 		mode = "blacklist"
 	}
 
 	settings := appProxySettings{enabled: true, mode: mode}
-	if mode == "whitelist" {
-		settings.proxyApps = removeApps(append(parseAppList(cfg["proxy_apps_list"]), forceProxy...), forceBypass)
-	} else {
-		settings.bypassApps = removeApps(append(parseAppList(cfg["bypass_apps_list"]), forceBypass...), forceProxy)
+	autoProxy, autoBypass := []string(nil), []string(nil)
+	if cfg["app_proxy_enable"] == "1" && cfg["auto_proxy_apps_enable"] == "1" {
+		var err error
+		autoProxy, autoBypass, err = automaticAppLists(layout)
+		if err != nil {
+			return appProxySettings{}, err
+		}
 	}
-	return settings
+	if mode == "whitelist" {
+		settings.proxyApps = removeApps(append(append(autoProxy, parseAppList(cfg["proxy_apps_list"])...), forceProxy...), forceBypass)
+	} else {
+		settings.bypassApps = removeApps(append(append(autoBypass, parseAppList(cfg["bypass_apps_list"])...), forceBypass...), forceProxy)
+	}
+	return settings, nil
 }
 
 func injectAppProxy(inbound map[string]any, apps appProxySettings) {
@@ -174,16 +182,7 @@ func readAppList(path string) []string {
 	if err != nil {
 		return nil
 	}
-	lines := strings.Split(string(data), "\n")
-	var result []string
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		result = append(result, line)
-	}
-	return result
+	return normalizePackageList(string(data))
 }
 
 func readConfigKV(path string) map[string]string {

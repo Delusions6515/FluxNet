@@ -135,6 +135,11 @@ func (l *Layout) ForceBypassApps() string {
 	return filepath.Join(l.ConfigDir(), "force_bypass_app.txt")
 }
 
+// ProxyPackageList returns the cached v2rayNG proxy-package catalogue.
+func (l *Layout) ProxyPackageList() string {
+	return filepath.Join(l.ConfigDir(), "proxy_package_name")
+}
+
 // ---- Runtime paths (under DataDir) ----
 
 // RunDir returns the runtime directory.

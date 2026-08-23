@@ -47,19 +47,25 @@ func ApplyRuntime(layout *paths.Layout) (string, error) {
 		return "", fmt.Errorf("加载活跃配置失败: %w", err)
 	}
 
-	// 2. Generate inbound from template
+	// 2. Resolve application filtering once for inbound and ATP.
+	apps, err := effectiveAppProxy(layout)
+	if err != nil {
+		return "", fmt.Errorf("生成应用名单失败: %w", err)
+	}
+
+	// 3. Generate inbound from template
 	tmpl := NewTemplate(layout)
-	inbound, err := tmpl.Apply(mode)
+	inbound, err := tmpl.Apply(mode, apps)
 	if err != nil {
 		return "", fmt.Errorf("入站模板处理失败: %w", err)
 	}
 
-	// 3. Inject inbound into inbounds array
+	// 4. Inject inbound into inbounds array
 	if err := injectInbound(&fullConfig, inbound); err != nil {
 		return "", fmt.Errorf("入站注入失败: %w", err)
 	}
 
-	// 4. Write run/config.json
+	// 5. Write run/config.json
 	runConfigDir := layout.RunConfigDir()
 	if err := os.MkdirAll(runConfigDir, 0755); err != nil {
 		return "", fmt.Errorf("创建运行配置目录失败: %w", err)
@@ -74,9 +80,9 @@ func ApplyRuntime(layout *paths.Layout) (string, error) {
 		return "", fmt.Errorf("写入运行配置失败: %w", err)
 	}
 
-	// 5. atp for tproxy/redirect modes
+	// 6. atp for tproxy/redirect modes
 	if mode == "tproxy" || mode == "redirect" {
-		if err := applyAtp(layout, mode); err != nil {
+		if err := applyAtp(layout, mode, apps); err != nil {
 			return "", fmt.Errorf("atp 规则应用失败: %w", err)
 		}
 	}
@@ -171,14 +177,14 @@ func injectInbound(config *map[string]any, inbound json.RawMessage) error {
 }
 
 // applyAtp generates the atp runtime config and calls atp start.
-func applyAtp(layout *paths.Layout, mode string) error {
+func applyAtp(layout *paths.Layout, mode string, apps appProxySettings) error {
 	// Read tproxy.conf template
 	tproxyConfPath := layout.TproxyConf()
 	tproxyData, err := os.ReadFile(tproxyConfPath)
 	if err != nil {
 		return fmt.Errorf("读取 tproxy.conf 失败: %w", err)
 	}
-	tproxyData = injectAtpAppSettings(tproxyData, effectiveAppProxy(layout), mode)
+	tproxyData = injectAtpAppSettings(tproxyData, apps, mode)
 
 	// Write runtime tproxy config
 	tproxyDir := layout.RunTproxyDir()

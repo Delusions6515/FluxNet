@@ -4,64 +4,22 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"os"
-	"os/exec"
-	"sort"
-	"strings"
 
 	"github.com/Delusions6515/FluxNet/internal/config"
 	"github.com/Delusions6515/FluxNet/internal/paths"
 	"github.com/Delusions6515/FluxNet/internal/result"
 )
 
-// defaultProxyList is a minimal built-in proxy-suggested package list (v2rayNG-style).
-var defaultProxyList = []string{
-	"com.google.android.gms",
-	"com.google.android.youtube",
-	"com.twitter.android",
-	"com.instagram.android",
-	"com.zhiliaoapp.musically",
-}
-
-// Update runs "pm list packages" and intersects with the default proxy list,
-// writing force_proxy_app.txt and force_bypass_app.txt.
+// Update refreshes the v2rayNG proxy-package catalogue.
 func Update(layout *paths.Layout, jsonFormat bool) {
-	// Run pm list packages
-	out, err := exec.Command("pm", "list", "packages").Output()
-	if err != nil {
-		result.Err(jsonFormat, "app.pm_failed", "pm list packages 失败: "+err.Error())
-		return
-	}
-
-	installed := make(map[string]bool)
-	for _, line := range strings.Split(string(out), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "package:") {
-			installed[strings.TrimPrefix(line, "package:")] = true
-		}
-	}
-
-	// Intersect with default list
-	var proxy []string
-	for _, pkg := range defaultProxyList {
-		if installed[pkg] {
-			proxy = append(proxy, pkg)
-		}
-	}
-	sort.Strings(proxy)
-
-	// Write proxy list
-	_ = os.WriteFile(layout.ForceProxyApps(), []byte(strings.Join(proxy, "\n")+"\n"), 0600)
-	// Write empty bypass list
-	_ = os.WriteFile(layout.ForceBypassApps(), []byte(""), 0600)
-
-	result.OK(jsonFormat, "app.updated", fmt.Sprintf("已更新应用名单 (%d 个代理应用)", len(proxy)))
+	Upgrade(layout, jsonFormat)
 }
 
 // Show reads and displays the current app lists.
 func Show(layout *paths.Layout, jsonFormat bool) {
-	proxyApps := readLines(layout.ForceProxyApps())
-	bypassApps := readLines(layout.ForceBypassApps())
+	settings := config.ReadSettings(layout)
+	proxyApps := settings.ForceProxyApps
+	bypassApps := settings.ForceBypassApps
 
 	data := map[string]any{
 		"proxy":  proxyApps,
@@ -91,9 +49,14 @@ func Show(layout *paths.Layout, jsonFormat bool) {
 	}
 }
 
-// Upgrade is a placeholder for updating the default proxy list from online.
+// Upgrade downloads the latest v2rayNG proxy package catalogue.
 func Upgrade(layout *paths.Layout, jsonFormat bool) {
-	result.OK(jsonFormat, "app.upgraded", "预置名单已更新")
+	count, err := config.UpdateProxyPackageList(layout)
+	if err != nil {
+		result.Err(jsonFormat, "app.upgrade_failed", err.Error())
+		return
+	}
+	result.OK(jsonFormat, "app.upgraded", fmt.Sprintf("预置名单已更新 (%d 个包名)", count))
 }
 
 // Replace updates the user-managed application list used by the WebUI.
@@ -117,17 +80,36 @@ func Replace(layout *paths.Layout, jsonFormat bool, mode, encoded string) {
 	result.Text(result.Success("app.replaced", "应用名单已保存", settings), jsonFormat)
 }
 
-func readLines(path string) []string {
-	data, err := os.ReadFile(path)
+// ReplaceForce updates one user-managed force list.
+func ReplaceForce(layout *paths.Layout, jsonFormat bool, kind, encoded string) {
+	data, err := base64.StdEncoding.DecodeString(encoded)
 	if err != nil {
-		return nil
+		result.Err(jsonFormat, "app.invalid_input", "应用名单编码无效")
+		return
 	}
-	var result []string
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" && !strings.HasPrefix(line, "#") {
-			result = append(result, line)
-		}
+	var apps []string
+	if err := json.Unmarshal(data, &apps); err != nil {
+		result.Err(jsonFormat, "app.invalid_input", "应用名单必须是 JSON 数组")
+		return
 	}
-	return result
+	settings, err := config.ReplaceForceAppList(layout, kind, apps)
+	if err != nil {
+		result.Err(jsonFormat, "app.write_failed", err.Error())
+		return
+	}
+	result.Text(result.Success("app.force_replaced", "强制应用名单已保存", settings), jsonFormat)
+}
+
+// Installed returns package names through the module CLI, not the WebUI shell bridge.
+func Installed(jsonFormat bool) {
+	packages, err := config.ListInstalledPackages()
+	if err != nil {
+		result.Err(jsonFormat, "app.pm_failed", err.Error())
+		return
+	}
+	apps := make([]map[string]string, 0, len(packages))
+	for _, packageName := range packages {
+		apps = append(apps, map[string]string{"packageName": packageName, "appLabel": packageName})
+	}
+	result.Text(result.Success("app.installed", "已安装应用", map[string]any{"apps": apps}), jsonFormat)
 }
