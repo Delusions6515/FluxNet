@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -70,10 +71,32 @@ func start(layout *paths.Layout, formatJSON bool) {
 	// Disable Private DNS to prevent DNS leaks
 	savePrivateDns(layout)
 
+	// Keep sing-box independent from the caller's terminal or WebUI RPC pipes.
+	// A long-lived child holding those pipes prevents KernelSU exec/spawn from
+	// completing and makes the service vulnerable to caller cleanup.
+	if err := os.MkdirAll(layout.LogsDir(), 0755); err != nil {
+		result.Err(formatJSON, "service.log_dir_failed", "创建服务日志目录失败: "+err.Error())
+		return
+	}
+	serviceLog, err := os.OpenFile(filepath.Join(layout.LogsDir(), "sing-box.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		result.Err(formatJSON, "service.log_open_failed", "打开服务日志失败: "+err.Error())
+		return
+	}
+	defer serviceLog.Close()
+	stdin, err := os.Open(os.DevNull)
+	if err != nil {
+		result.Err(formatJSON, "service.stdin_open_failed", "打开空输入失败: "+err.Error())
+		return
+	}
+	defer stdin.Close()
+
 	// Start sing-box without waiting for its long-running process to exit.
 	svcCmd := exec.Command(bin, "run", "-c", runConfig, "-D", layout.RunDir())
-	svcCmd.Stdout = os.Stdout
-	svcCmd.Stderr = os.Stderr
+	svcCmd.Stdin = stdin
+	svcCmd.Stdout = serviceLog
+	svcCmd.Stderr = serviceLog
+	svcCmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 
 	if err := svcCmd.Start(); err != nil {
 		result.Err(formatJSON, "service.start_failed", "启动 sing-box 失败: "+err.Error())

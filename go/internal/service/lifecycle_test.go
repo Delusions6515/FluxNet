@@ -1,6 +1,7 @@
 package service
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,11 +48,76 @@ func TestStartReturnsPromptlyAndLeavesServiceRunning(t *testing.T) {
 		t.Fatalf("Start did not apply the runtime config: %v", err)
 	}
 
-	pid := readPID(layout)
-	if pid <= 0 || !processAlive(pid, layout.SingBoxBin()) {
-		t.Fatalf("service is not running after Start, pid=%d", pid)
+	if !waitForServiceProcess(layout, time.Second) {
+		t.Fatalf("service is not running after Start, pid=%d", readPID(layout))
 	}
 	t.Cleanup(func() { Stop(layout, false) })
+}
+
+func TestStartDoesNotKeepCallerOutputPipeOpen(t *testing.T) {
+	root := t.TempDir()
+	layout := paths.New(filepath.Join(root, "module"), filepath.Join(root, "data"))
+
+	for _, dir := range []string{filepath.Dir(layout.SingBoxBin()), layout.InboundTemplateDir(), layout.RunDir(), layout.ConfigDir()} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(layout.ConfigDir(), "fluxnet.config"), []byte("proxy_mode=tun\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(layout.InboundTemplate("tun"), []byte(`{"type":"tun","tag":"tun-in"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	const fakeSingBox = "#!/bin/sh\nif [ \"$1\" = \"check\" ]; then exit 0; fi\ntrap 'exit 0' TERM INT\nwhile :; do sleep 1; done\n"
+	if err := os.WriteFile(layout.SingBoxBin(), []byte(fakeSingBox), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalStdout := os.Stdout
+	os.Stdout = writer
+	Start(layout, false)
+	os.Stdout = originalStdout
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !waitForServiceProcess(layout, time.Second) {
+		t.Fatalf("service is not running after Start, pid=%d", readPID(layout))
+	}
+	t.Cleanup(func() {
+		Stop(layout, false)
+		_ = reader.Close()
+	})
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := io.ReadAll(reader)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("sing-box kept the caller output pipe open")
+	}
+}
+
+func waitForServiceProcess(layout *paths.Layout, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		pid := readPID(layout)
+		if pid > 0 && processAlive(pid, layout.SingBoxBin()) {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return false
 }
 
 func TestRestartDoesNotStopAtpForTunRuntime(t *testing.T) {
