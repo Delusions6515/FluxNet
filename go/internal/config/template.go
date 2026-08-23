@@ -180,7 +180,7 @@ func uniqueApps(apps []string) []string {
 func readAppList(path string) []string {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil
+		return []string{}
 	}
 	return normalizePackageList(string(data))
 }

@@ -43,6 +43,13 @@ func TestReplaceForceAppList(t *testing.T) {
 	}
 }
 
+func TestReadSettingsUsesEmptyForceLists(t *testing.T) {
+	settings := ReadSettings(testSettingsLayout(t))
+	if settings.ForceProxyApps == nil || settings.ForceBypassApps == nil {
+		t.Fatalf("force app lists must serialize as arrays: %#v", settings)
+	}
+}
+
 func TestReplaceAppListWritesActiveMode(t *testing.T) {
 	layout := testSettingsLayout(t)
 	if _, err := UpdateSetting(layout, "app_proxy_enable", "0"); err != nil {
