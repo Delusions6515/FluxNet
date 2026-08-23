@@ -340,7 +340,7 @@ func cmdWorker(layout *paths.Layout, args []string) {
 
 func cmdAppList(layout *paths.Layout, args []string) {
 	if len(args) == 0 {
-		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list show|catalog|upgrade|replace|replace-both|force-replace")
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list show|catalog|upgrade|replace|force-replace")
 		return
 	}
 	switch args[0] {
@@ -356,12 +356,6 @@ func cmdAppList(layout *paths.Layout, args []string) {
 			return
 		}
 		app.Replace(layout, jsonOutput, args[1], args[2])
-	case "replace-both":
-		if len(args) != 3 {
-			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list replace-both <proxy-base64-json> <bypass-base64-json>")
-			return
-		}
-		app.ReplaceBoth(layout, jsonOutput, args[1], args[2])
 	case "force-replace":
 		if len(args) != 3 {
 			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list force-replace <proxy|bypass> <base64-json>")
@@ -369,7 +363,7 @@ func cmdAppList(layout *paths.Layout, args []string) {
 		}
 		app.ReplaceForce(layout, jsonOutput, args[1], args[2])
 	default:
-		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list show|catalog|upgrade|replace|replace-both|force-replace")
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet app-list show|catalog|upgrade|replace|force-replace")
 	}
 }
 

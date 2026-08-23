@@ -95,10 +95,6 @@ export function mockGateway(command, args = []) {
       state.settings[key] = JSON.parse(atob(args[1]));
       return result("app.replaced", "应用名单已保存", state.settings);
     }
-    case "app-list-replace-both":
-      state.settings.proxy_apps = JSON.parse(atob(args[0]));
-      state.settings.bypass_apps = JSON.parse(atob(args[1]));
-      return result("app.replaced", "应用名单已保存", state.settings);
     case "app-list-force-replace": {
       const key =
         args[0] === "proxy" ? "force_proxy_apps" : "force_bypass_apps";

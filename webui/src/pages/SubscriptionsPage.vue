@@ -10,11 +10,14 @@ import {
   MiuixButton,
   MiuixCard,
   MiuixDialog,
+  MiuixIcon,
+  MiuixIconButton,
   MiuixInput,
   MiuixSmallTitle,
   MiuixText,
   showSnackbar,
 } from "miuix-vue";
+import { Back } from "miuix-vue/icons";
 import {
   addRemoteSubscription,
   createLocalSubscription,
@@ -111,10 +114,14 @@ onActivated(load);
 <template>
   <div class="page">
     <div v-show="editorName" class="editor-page">
-      <div class="section page-actions">
-        <MiuixButton type="secondary" @click="editorName = ''">
-          返回订阅列表
-        </MiuixButton>
+      <div class="section editor-page__back">
+        <MiuixIconButton
+          aria-label="返回订阅列表"
+          title="返回订阅列表"
+          @click="editorName = ''"
+        >
+          <MiuixIcon :icon="Back" />
+        </MiuixIconButton>
       </div>
       <Suspense v-if="editorVisited">
         <template #default>
@@ -241,6 +248,9 @@ onActivated(load);
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+.editor-page__back {
+  display: flex;
 }
 .editor-loading {
   flex: 1;

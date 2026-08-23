@@ -5,12 +5,13 @@ import {
   onActivated,
   onMounted,
   ref,
-  watch,
 } from "vue";
 import {
   MiuixButton,
   MiuixCard,
   MiuixDropdownPreference,
+  MiuixIcon,
+  MiuixIconButton,
   MiuixInput,
   MiuixSmallTitle,
   MiuixSwitchPreference,
@@ -18,13 +19,11 @@ import {
   MiuixText,
   showSnackbar,
 } from "miuix-vue";
+import { Back } from "miuix-vue/icons";
 import {
   getInstalledApps,
-  getProxyPackageCatalog,
   getSettings,
-  partitionInstalledApps,
   replaceAppList,
-  replaceAppLists,
   replaceForceAppList,
   setSetting,
   upgradeProxyPackageList,
@@ -41,7 +40,6 @@ const pinned = ref([]);
 const error = ref("");
 const savingApps = ref(false);
 const upgrading = ref(false);
-const generatingApps = ref(false);
 const loadingApps = ref(false);
 const tab = ref(0);
 const configEditorTarget = ref("");
@@ -174,27 +172,6 @@ async function saveApps() {
     savingApps.value = false;
   }
 }
-async function generateApps() {
-  generatingApps.value = true;
-  try {
-    const [catalog, installedApps] = await Promise.all([
-      getProxyPackageCatalog(),
-      getInstalledApps(),
-    ]);
-    const { proxyApps, bypassApps } = partitionInstalledApps(
-      catalog.packages || [],
-      installedApps,
-    );
-    settings.value = await replaceAppLists(proxyApps, bypassApps);
-    syncSelection();
-    showSnackbar({ message: "应用名单已生成", withDismissAction: true });
-  } catch (err) {
-    error.value = err.message;
-    showError(err);
-  } finally {
-    generatingApps.value = false;
-  }
-}
 async function upgradeApps() {
   upgrading.value = true;
   try {
@@ -215,10 +192,14 @@ onActivated(load);
 <template>
   <div class="page">
     <div v-if="configEditorTarget" class="editor-page">
-      <div class="section page-actions">
-        <MiuixButton type="secondary" @click="configEditorTarget = ''">
-          返回普通代理设置
-        </MiuixButton>
+      <div class="section editor-page__back">
+        <MiuixIconButton
+          aria-label="返回普通代理设置"
+          title="返回普通代理设置"
+          @click="configEditorTarget = ''"
+        >
+          <MiuixIcon :icon="Back" />
+        </MiuixIconButton>
       </div>
       <Suspense>
         <template #default>
@@ -236,8 +217,11 @@ onActivated(load);
       </Suspense>
     </div>
 
-    <div v-else>
-      <MiuixCard class="section section--compact proxy-tabs">
+    <div v-else class="proxy-settings">
+      <MiuixCard
+        v-show="!appListEditorOpen"
+        class="section section--compact proxy-tabs"
+      >
         <MiuixTabRow
           v-model="tab"
           :tabs="['普通设置', '分应用代理设置']"
@@ -294,14 +278,21 @@ onActivated(load);
         </MiuixCard>
       </div>
 
-      <div v-show="tab === 1 && appListEditorOpen" class="editor-page">
-        <div class="section page-actions">
-          <MiuixButton type="secondary" @click="appListEditorOpen = false">
-            返回分应用代理设置
-          </MiuixButton>
+      <div
+        v-show="tab === 1 && appListEditorOpen"
+        class="editor-page app-list-editor"
+      >
+        <div class="section editor-page__back">
+          <MiuixIconButton
+            aria-label="返回分应用代理设置"
+            title="返回分应用代理设置"
+            @click="appListEditorOpen = false"
+          >
+            <MiuixIcon :icon="Back" />
+          </MiuixIconButton>
         </div>
         <MiuixSmallTitle :text="appListTitle" />
-        <MiuixCard class="section">
+        <MiuixCard class="section app-list-editor__card">
           <MiuixInput v-model="query" label="搜索已安装应用" />
           <div class="app-list">
             <button
@@ -329,10 +320,7 @@ onActivated(load);
             </button>
           </div>
           <div class="page-actions">
-            <MiuixButton
-              :disabled="savingApps || generatingApps"
-              @click="saveApps"
-            >
+            <MiuixButton :disabled="savingApps" @click="saveApps">
               {{ savingApps ? "保存中…" : "保存应用名单" }}
             </MiuixButton>
           </div>
@@ -373,13 +361,6 @@ onActivated(load);
             >
               {{ upgrading ? "更新中…" : "更新预置名单" }}
             </MiuixButton>
-            <MiuixButton
-              type="secondary"
-              :disabled="generatingApps"
-              @click="generateApps"
-            >
-              {{ generatingApps ? "生成中…" : "从预置名单生成" }}
-            </MiuixButton>
             <MiuixButton :disabled="loadingApps" @click="openAppListEditor">
               {{ loadingApps ? "加载中…" : `编辑${appListTitle}` }}
             </MiuixButton>
@@ -396,11 +377,36 @@ onActivated(load);
 <style scoped>
 .editor-page {
   display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.editor-page__back {
+  display: flex;
+}
+.app-list-editor {
+  min-height: 0;
+}
+.proxy-settings {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.app-list-editor__card {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.app-list-editor__card :deep(.m-card) {
+  display: flex;
+  flex: 1;
   flex-direction: column;
   min-height: 0;
 }
 .app-list {
-  max-height: 360px;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   margin: 12px -4px;
 }

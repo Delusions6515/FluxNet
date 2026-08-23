@@ -71,37 +71,6 @@ func TestReplaceAppListWritesIndependentFile(t *testing.T) {
 	}
 }
 
-func TestReplaceAppListsValidatesBothBeforeWriting(t *testing.T) {
-	layout := testSettingsLayout(t)
-	if err := os.WriteFile(layout.ProxyApps(), []byte("com.example.old\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := ReplaceAppLists(layout, []string{"com.example.new"}, []string{"invalid package"}); err == nil {
-		t.Fatal("ReplaceAppLists accepted an invalid bypass package")
-	}
-	data, err := os.ReadFile(layout.ProxyApps())
-	if err != nil || string(data) != "com.example.old\n" {
-		t.Fatalf("proxy list changed after failed replacement: %q, %v", data, err)
-	}
-}
-
-func TestReplaceAppListsRestoresProxyAfterBypassWriteFailure(t *testing.T) {
-	layout := testSettingsLayout(t)
-	if err := os.WriteFile(layout.ProxyApps(), []byte("com.example.old\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Mkdir(layout.BypassApps(), 0755); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := ReplaceAppLists(layout, []string{"com.example.new"}, []string{"com.example.bypass"}); err == nil {
-		t.Fatal("ReplaceAppLists accepted a directory as bypass list")
-	}
-	data, err := os.ReadFile(layout.ProxyApps())
-	if err != nil || string(data) != "com.example.old\n" {
-		t.Fatalf("proxy list was not restored: %q, %v", data, err)
-	}
-}
-
 func testSettingsLayout(t *testing.T) *paths.Layout {
 	t.Helper()
 	root := t.TempDir()

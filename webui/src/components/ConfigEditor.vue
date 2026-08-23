@@ -127,14 +127,33 @@ watch(
 
 <style scoped>
 .config-editor__code {
-  min-height: 300px;
+  flex: 1;
+  min-height: 0;
 }
 .config-editor__code :deep(.cm-editor),
 .config-editor__code :deep(.cm-scroller) {
-  min-height: 300px;
+  height: 100%;
+  min-height: 0;
   font:
     13px/1.55 "JetBrains Mono Variable",
     monospace;
+}
+.config-editor {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.config-editor__card {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.config-editor__card :deep(.m-card) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
 }
 .config-editor__error,
 .config-editor__actions {

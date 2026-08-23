@@ -74,11 +74,6 @@ export const replaceAppList = (mode, apps) =>
   gateway("app-list-replace", [mode, encode(JSON.stringify(apps))]);
 export const replaceForceAppList = (kind, apps) =>
   gateway("app-list-force-replace", [kind, encode(JSON.stringify(apps))]);
-export const replaceAppLists = (proxyApps, bypassApps) =>
-  gateway("app-list-replace-both", [
-    encode(JSON.stringify(proxyApps)),
-    encode(JSON.stringify(bypassApps)),
-  ]);
 export const upgradeProxyPackageList = () => gateway("app-list-upgrade");
 export const getProxyPackageCatalog = () => gateway("app-list-catalog");
 export const readUserInbound = (mode) => gateway("config-inbound-read", [mode]);
@@ -103,19 +98,6 @@ export const writeLocalSubscription = (name, content) =>
   gateway("local-write", [name, encode(content)]);
 export function serviceAction(action) {
   return gateway(`service-${action}`);
-}
-
-export function partitionInstalledApps(catalog, installedApps) {
-  const proxyPackages = new Set(catalog);
-  return installedApps.reduce(
-    (lists, app) => {
-      lists[
-        proxyPackages.has(app.packageName) ? "proxyApps" : "bypassApps"
-      ].push(app.packageName);
-      return lists;
-    },
-    { proxyApps: [], bypassApps: [] },
-  );
 }
 
 export async function getInstalledApps() {

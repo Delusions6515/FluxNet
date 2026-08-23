@@ -81,26 +81,6 @@ func Replace(layout *paths.Layout, jsonFormat bool, mode, encoded string) {
 	result.Text(result.Success("app.replaced", "应用名单已保存", settings), jsonFormat)
 }
 
-// ReplaceBoth updates the proxy and bypass base lists after validating both.
-func ReplaceBoth(layout *paths.Layout, jsonFormat bool, encodedProxy, encodedBypass string) {
-	proxyApps, err := decodeAppList(encodedProxy)
-	if err != nil {
-		result.Err(jsonFormat, "app.invalid_input", err.Error())
-		return
-	}
-	bypassApps, err := decodeAppList(encodedBypass)
-	if err != nil {
-		result.Err(jsonFormat, "app.invalid_input", err.Error())
-		return
-	}
-	settings, err := config.ReplaceAppLists(layout, proxyApps, bypassApps)
-	if err != nil {
-		result.Err(jsonFormat, "app.write_failed", err.Error())
-		return
-	}
-	result.Text(result.Success("app.replaced", "应用名单已保存", settings), jsonFormat)
-}
-
 // ReplaceForce updates one user-managed force list.
 func ReplaceForce(layout *paths.Layout, jsonFormat bool, kind, encoded string) {
 	apps, err := decodeAppList(encoded)
