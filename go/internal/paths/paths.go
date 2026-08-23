@@ -187,6 +187,11 @@ func (l *Layout) WorkerPidFile() string {
 	return filepath.Join(l.RunDir(), "worker.pid")
 }
 
+// ServiceRequestFile is the single pending lifecycle request consumed by Worker.
+func (l *Layout) ServiceRequestFile() string {
+	return filepath.Join(l.RunDir(), "service-request")
+}
+
 // ConfigChangedMarker returns the .config-changed marker path.
 func (l *Layout) ConfigChangedMarker() string {
 	return filepath.Join(l.RunDir(), ".config-changed")

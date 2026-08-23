@@ -1,4 +1,4 @@
-import { enableEdgeToEdge, exec, moduleInfo, spawn } from "kernelsu";
+import { enableEdgeToEdge, exec, moduleInfo } from "kernelsu";
 import { MOCK_PACKAGES, mockGateway } from "./mock";
 
 export const isBrowserDev = typeof window !== "undefined" && !window.ksu;
@@ -90,36 +90,7 @@ export const readLocalSubscription = (name) => gateway("local-read", [name]);
 export const writeLocalSubscription = (name, content) =>
   gateway("local-write", [name, encode(content)]);
 export function serviceAction(action) {
-  const command = `service-${action}`;
-  if (isBrowserDev) return gateway(command);
-
-  return new Promise((resolve, reject) => {
-    const child = spawn("sh", [script, command]);
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (data) => {
-      stdout += data;
-    });
-    child.stderr.on("data", (data) => {
-      stderr += data;
-    });
-    child.on("error", reject);
-    child.on("exit", (code) => {
-      if (code !== 0) {
-        reject(new Error(stderr || stdout || "模块命令执行失败"));
-        return;
-      }
-      try {
-        const response = JSON.parse(stdout);
-        if (response.schema !== 1) throw new Error("模块响应版本不受支持");
-        if (!response.ok)
-          throw new Error(response.message || response.code || "模块操作失败");
-        resolve(response.data);
-      } catch (error) {
-        reject(error);
-      }
-    });
-  });
+  return gateway(`service-${action}`);
 }
 
 export async function getInstalledApps() {

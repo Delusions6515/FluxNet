@@ -17,13 +17,13 @@ case "$command" in
     exec "$FLUXNET" --json service status
     ;;
   service-start)
-    exec "$FLUXNET" --json service start
+    exec "$FLUXNET" --json service request start
     ;;
   service-stop)
-    exec "$FLUXNET" --json service stop
+    exec "$FLUXNET" --json service request stop
     ;;
   service-restart)
-    exec "$FLUXNET" --json service restart
+    exec "$FLUXNET" --json service request restart
     ;;
   health)
     exec "$FLUXNET" --json health

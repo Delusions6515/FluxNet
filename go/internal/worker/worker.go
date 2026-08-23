@@ -20,6 +20,11 @@ const (
 	hotReloadInterval  = 1 * time.Second
 )
 
+var (
+	workerProcessAlive = processAlive
+	runServiceAction   = runServiceActionNow
+)
+
 // Start launches the background worker process.
 func Start(layout *paths.Layout, formatJSON bool) {
 	fluxnetBin := layout.FluxNetBin()
@@ -93,12 +98,86 @@ func Run(layout *paths.Layout) {
 			}
 
 		case <-hotTicker.C:
+			processServiceRequest(layout)
+
 			// modules_update → wait for swap → restart
 			if _, err := os.Stat(layout.ModulesUpdateDir()); err == nil {
 				time.Sleep(2 * time.Second)
 				service.Restart(layout, false)
 			}
 		}
+	}
+}
+
+// RequestServiceAction submits one lifecycle operation to the boot-started
+// worker. It returns immediately so a KernelSU WebUI shell never owns the
+// restart process.
+func RequestServiceAction(layout *paths.Layout, action string) error {
+	action = strings.TrimSpace(action)
+	if !validServiceAction(action) {
+		return fmt.Errorf("不支持的服务操作: %s", action)
+	}
+	if !workerProcessAlive(readWorkerPID(layout)) {
+		return fmt.Errorf("后台 Worker 未运行")
+	}
+	if err := os.MkdirAll(layout.RunDir(), 0755); err != nil {
+		return fmt.Errorf("创建运行目录失败: %w", err)
+	}
+
+	request, err := os.CreateTemp(layout.RunDir(), ".service-request-")
+	if err != nil {
+		return fmt.Errorf("创建服务请求失败: %w", err)
+	}
+	temporary := request.Name()
+	defer os.Remove(temporary)
+	if _, err := request.WriteString(action + "\n"); err != nil {
+		request.Close()
+		return fmt.Errorf("写入服务请求失败: %w", err)
+	}
+	if err := request.Close(); err != nil {
+		return fmt.Errorf("关闭服务请求失败: %w", err)
+	}
+	if err := os.Link(temporary, layout.ServiceRequestFile()); err != nil {
+		if os.IsExist(err) {
+			return fmt.Errorf("已有服务操作正在执行")
+		}
+		return fmt.Errorf("提交服务请求失败: %w", err)
+	}
+	return nil
+}
+
+func processServiceRequest(layout *paths.Layout) {
+	data, err := os.ReadFile(layout.ServiceRequestFile())
+	if os.IsNotExist(err) {
+		return
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[Warn] 读取服务请求失败: %s\n", err)
+		return
+	}
+	action := strings.TrimSpace(string(data))
+	if !validServiceAction(action) {
+		fmt.Fprintf(os.Stderr, "[Warn] 忽略无效服务请求: %q\n", action)
+		_ = os.Remove(layout.ServiceRequestFile())
+		return
+	}
+
+	runServiceAction(layout, action)
+	_ = os.Remove(layout.ServiceRequestFile())
+}
+
+func validServiceAction(action string) bool {
+	return action == "start" || action == "stop" || action == "restart"
+}
+
+func runServiceActionNow(layout *paths.Layout, action string) {
+	switch action {
+	case "start":
+		service.Start(layout, false)
+	case "stop":
+		service.Stop(layout, false)
+	case "restart":
+		service.Restart(layout, false)
 	}
 }
 

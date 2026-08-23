@@ -77,7 +77,7 @@ func usage() {
   %s [--json] [--module-dir <路径>] [--data-dir <路径>] [--timeout <秒>] <命令> [参数...]
 
 命令:
-  service start|stop|restart|status|logs  服务生命周期管理
+	service start|stop|restart|request|status|logs  服务生命周期管理
   config apply|show|set|inbound|tproxy  运行配置和基础设置
   subscription add|update|list|remove|switch  订阅管理
   worker start|stop                  后台 Worker
@@ -125,12 +125,22 @@ func cmdService(layout *paths.Layout, args []string) {
 		service.Stop(layout, jsonOutput)
 	case "restart":
 		service.Restart(layout, jsonOutput)
+	case "request":
+		if len(args) != 2 {
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet service request <start|stop|restart>")
+			return
+		}
+		if err := worker.RequestServiceAction(layout, args[1]); err != nil {
+			result.Err(jsonOutput, "service.request_failed", err.Error())
+			return
+		}
+		result.Text(result.Success("service.queued", "服务操作已提交", map[string]string{"action": args[1]}), jsonOutput)
 	case "logs":
 		logs.Show(layout, jsonOutput)
 	case "status":
 		service.Status(layout, jsonOutput)
 	default:
-		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet service start|stop|restart|status|logs")
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet service start|stop|restart|request|status|logs")
 	}
 }
 

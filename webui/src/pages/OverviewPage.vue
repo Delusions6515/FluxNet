@@ -1,5 +1,12 @@
 <script setup>
-import { computed, onActivated, onMounted, ref } from "vue";
+import {
+  computed,
+  onActivated,
+  onBeforeUnmount,
+  onDeactivated,
+  onMounted,
+  ref,
+} from "vue";
 import {
   MiuixButton,
   MiuixCard,
@@ -14,9 +21,21 @@ const data = ref(null);
 const loading = ref(false);
 const busy = ref("");
 const error = ref("");
+let refreshTimer;
 const status = computed(() => data.value?.service);
 function showError(err) {
   showSnackbar({ message: err.message || "操作失败", withDismissAction: true });
+}
+function clearScheduledRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = undefined;
+}
+function scheduleRefresh() {
+  clearScheduledRefresh();
+  refreshTimer = setTimeout(() => {
+    refreshTimer = undefined;
+    void refresh(true);
+  }, 1200);
 }
 async function refresh(force = false) {
   if (loading.value || (busy.value && !force)) return;
@@ -37,10 +56,10 @@ async function run(action) {
   try {
     await serviceAction(action);
     showSnackbar({
-      message: action === "restart" ? "配置已应用并重启" : "服务操作完成",
+      message: action === "restart" ? "配置已提交并重启" : "服务操作已提交",
       withDismissAction: true,
     });
-    await refresh(true);
+    scheduleRefresh();
   } catch (err) {
     error.value = err.message;
     showError(err);
@@ -50,6 +69,8 @@ async function run(action) {
 }
 onMounted(refresh);
 onActivated(refresh);
+onDeactivated(clearScheduledRefresh);
+onBeforeUnmount(clearScheduledRefresh);
 </script>
 
 <template>
