@@ -112,51 +112,54 @@ onActivated(load);
   <div class="page">
     <div v-show="editorName" class="editor-page">
       <div class="section page-actions">
-        <MiuixButton type="secondary" @click="editorName = ''"
-          >返回订阅列表</MiuixButton
-        >
+        <MiuixButton type="secondary" @click="editorName = ''">
+          返回订阅列表
+        </MiuixButton>
       </div>
-      <Suspense v-if="editorVisited"
-        ><template #default
-          ><JsonEditor :name="editorSourceName" @saved="load" /></template
-        ><template #fallback
-          ><MiuixCard class="section editor-loading"
-            ><MiuixText type="body2" class="muted"
-              >正在加载编辑器…</MiuixText
-            ></MiuixCard
-          ></template
-        ></Suspense
-      >
+      <Suspense v-if="editorVisited">
+        <template #default>
+          <JsonEditor :name="editorSourceName" @saved="load" />
+        </template>
+        <template #fallback>
+          <MiuixCard class="section editor-loading">
+            <MiuixText type="body2" class="muted">正在加载编辑器…</MiuixText>
+          </MiuixCard>
+        </template>
+      </Suspense>
     </div>
     <div v-show="!editorName">
-      <MiuixSmallTitle text="订阅" /><MiuixCard class="section"
-        ><MiuixText type="body2" class="muted">当前使用</MiuixText
-        ><MiuixText type="body1">{{ active || "未选择" }}</MiuixText>
+      <MiuixSmallTitle text="订阅" />
+      <MiuixCard class="section">
+        <MiuixText type="body2" class="muted">当前使用</MiuixText>
+        <MiuixText type="body1">{{ active || "未选择" }}</MiuixText>
         <div class="page-actions subscription-add">
           <MiuixButton
             type="primary"
             :disabled="Boolean(busy) || creating"
             @click="openDialog('remote')"
-            >添加远程订阅</MiuixButton
-          ><MiuixButton
+          >
+            添加远程订阅
+          </MiuixButton>
+          <MiuixButton
             type="secondary"
             :disabled="Boolean(busy) || creating"
             @click="openDialog('local')"
-            >新建本地订阅</MiuixButton
           >
-        </div></MiuixCard
-      >
-      <MiuixCard class="section section--compact"
-        ><div
+            新建本地订阅
+          </MiuixButton>
+        </div>
+      </MiuixCard>
+      <MiuixCard class="section section--compact">
+        <div
           v-for="item in index.subscriptions"
           :key="item.name"
           class="subscription-row"
         >
           <div>
-            <strong>{{ item.name }}</strong
-            ><span class="muted">{{
-              item.type === "remote" ? item.url : "本地 JSON 配置"
-            }}</span>
+            <strong>{{ item.name }}</strong>
+            <span class="muted">
+              {{ item.type === "remote" ? item.url : "本地 JSON 配置" }}
+            </span>
           </div>
           <div class="subscription-row__actions">
             <MiuixButton
@@ -164,44 +167,47 @@ onActivated(load);
               type="secondary"
               :disabled="Boolean(busy) || creating"
               @click="openEditor(item.name)"
-              >编辑</MiuixButton
-            ><MiuixButton
+            >
+              编辑
+            </MiuixButton>
+            <MiuixButton
               v-if="item.type === 'remote'"
               type="secondary"
               :disabled="Boolean(busy) || creating"
               @click="action('update', item)"
-              >{{
-                busy === `update:${item.name}` ? "更新中…" : "更新"
-              }}</MiuixButton
-            ><MiuixButton
+            >
+              {{ busy === `update:${item.name}` ? "更新中…" : "更新" }}
+            </MiuixButton>
+            <MiuixButton
               v-if="item.name !== active"
               type="secondary"
               :disabled="Boolean(busy) || creating"
               @click="action('switch', item)"
-              >{{
-                busy === `switch:${item.name}` ? "切换中…" : "切换"
-              }}</MiuixButton
-            ><MiuixButton
+            >
+              {{ busy === `switch:${item.name}` ? "切换中…" : "切换" }}
+            </MiuixButton>
+            <MiuixButton
               v-if="item.name !== active"
               type="secondary"
               :disabled="Boolean(busy) || creating"
               @click="action('remove', item)"
-              >{{
-                busy === `remove:${item.name}` ? "删除中…" : "删除"
-              }}</MiuixButton
             >
+              {{ busy === `remove:${item.name}` ? "删除中…" : "删除" }}
+            </MiuixButton>
           </div>
-        </div></MiuixCard
-      >
-      <MiuixText v-if="error" class="section error" type="body2">{{
-        error
-      }}</MiuixText>
+        </div>
+      </MiuixCard>
+      <MiuixText v-if="error" class="section error" type="body2">
+        {{ error }}
+      </MiuixText>
       <MiuixDialog
         v-model="dialogOpen"
         :title="dialogType === 'remote' ? '添加远程订阅' : '新建本地订阅'"
-        ><template #default
-          ><div class="subscription-dialog__fields">
-            <MiuixInput v-model="name" label="名称" /><MiuixInput
+      >
+        <template #default>
+          <div class="subscription-dialog__fields">
+            <MiuixInput v-model="name" label="名称" />
+            <MiuixInput
               v-if="dialogType === 'remote'"
               v-model="url"
               label="订阅 URL"
@@ -213,16 +219,19 @@ onActivated(load);
               type="secondary"
               :disabled="creating"
               @click="closeDialog"
-              >取消</MiuixButton
-            ><MiuixButton
+            >
+              取消
+            </MiuixButton>
+            <MiuixButton
               class="subscription-dialog__action"
               :disabled="creating || !name || (dialogType === 'remote' && !url)"
               @click="create"
-              >{{ creating ? "保存中…" : "保存" }}</MiuixButton
             >
-          </div></template
-        ></MiuixDialog
-      >
+              {{ creating ? "保存中…" : "保存" }}
+            </MiuixButton>
+          </div>
+        </template>
+      </MiuixDialog>
     </div>
   </div>
 </template>

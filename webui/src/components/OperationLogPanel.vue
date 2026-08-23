@@ -6,18 +6,18 @@ defineProps({ entries: { type: Array, default: () => [] } });
 <template>
   <MiuixSmallTitle text="最近日志" />
   <MiuixCard class="section log-panel">
-    <MiuixText v-if="!entries.length" class="muted" type="body2"
-      >暂无日志</MiuixText
-    >
+    <MiuixText v-if="!entries.length" class="muted" type="body2">
+      暂无日志
+    </MiuixText>
     <div
       v-for="(entry, index) in entries"
       :key="`${entry.timestamp}-${index}`"
       class="log-row"
     >
       <span class="log-row__time">{{ entry.timestamp }}</span>
-      <span :class="entry.level === 'error' ? 'error' : ''">{{
-        entry.message || entry.event
-      }}</span>
+      <span :class="entry.level === 'error' ? 'error' : ''">
+        {{ entry.message || entry.event }}
+      </span>
     </div>
   </MiuixCard>
 </template>

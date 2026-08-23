@@ -18,23 +18,29 @@ function open(url) {
 
 <template>
   <div class="page">
-    <MiuixSmallTitle text="FluxNet" /><MiuixCard class="section"
-      ><MiuixText type="body1"
-        >基于 sing-box 的 Android 透明代理模块。</MiuixText
-      ><MiuixText class="muted about-version" type="body2">{{
-        MODULE_VERSION ? `版本 ${MODULE_VERSION}` : "版本信息不可用"
-      }}</MiuixText></MiuixCard
-    ><MiuixSmallTitle text="相关项目" /><MiuixCard
-      class="section section--compact"
-      ><MiuixArrowPreference
+    <MiuixSmallTitle text="FluxNet" />
+    <MiuixCard class="section">
+      <MiuixText type="body1">
+        基于 sing-box 的 Android 透明代理模块。
+      </MiuixText>
+      <MiuixText class="muted about-version" type="body2">
+        {{ MODULE_VERSION ? `版本 ${MODULE_VERSION}` : "版本信息不可用" }}
+      </MiuixText>
+    </MiuixCard>
+    <MiuixSmallTitle text="相关项目" />
+    <MiuixCard class="section section--compact">
+      <MiuixArrowPreference
         v-for="link in links"
         :key="link.name"
         :title="link.name"
         :summary="link.url"
-        @click="open(link.url)" /></MiuixCard
-    ><MiuixSmallTitle text="许可" /><MiuixCard class="section"
-      ><MiuixText type="body2">AGPL-3.0</MiuixText></MiuixCard
-    >
+        @click="open(link.url)"
+      />
+    </MiuixCard>
+    <MiuixSmallTitle text="许可" />
+    <MiuixCard class="section">
+      <MiuixText type="body2">AGPL-3.0</MiuixText>
+    </MiuixCard>
   </div>
 </template>
 

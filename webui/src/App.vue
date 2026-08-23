@@ -71,18 +71,18 @@ onBeforeUnmount(() => {
       :subtitle="MODULE_VERSION ? `v${MODULE_VERSION}` : titles[index]"
     />
     <MiuixScrollArea ref="scroller" class="app-shell__body">
-      <Transition name="page" mode="out-in" @enter="restoreScroll"
-        ><KeepAlive><component :is="activePage" :key="index" /></KeepAlive
-      ></Transition>
+      <Transition name="page" mode="out-in" @enter="restoreScroll">
+        <KeepAlive><component :is="activePage" :key="index" /></KeepAlive>
+      </Transition>
     </MiuixScrollArea>
     <div ref="bottomBar" class="app-shell__bottom">
       <MiuixNavigationBar
         v-model="index"
         :items="titles.map((label) => ({ label }))"
       >
-        <template #icon="{ index: itemIndex }"
-          ><MiuixIcon :icon="icons[itemIndex]" :size="26"
-        /></template>
+        <template #icon="{ index: itemIndex }">
+          <MiuixIcon :icon="icons[itemIndex]" :size="26" />
+        </template>
       </MiuixNavigationBar>
     </div>
   </div>

@@ -106,18 +106,20 @@ watch(
         :disabled="loading || saving"
         placeholder="加载中…"
       />
-      <MiuixText v-if="error" class="error config-editor__error" type="body2">{{
-        error
-      }}</MiuixText>
+      <MiuixText v-if="error" class="error config-editor__error" type="body2">
+        {{ error }}
+      </MiuixText>
       <div class="page-actions config-editor__actions">
         <MiuixButton
           type="secondary"
           :disabled="loading || saving || !dirty"
           @click="load"
-          >重新加载</MiuixButton
-        ><MiuixButton :disabled="loading || saving || !dirty" @click="save">{{
-          saving ? "保存中…" : "保存"
-        }}</MiuixButton>
+        >
+          重新加载
+        </MiuixButton>
+        <MiuixButton :disabled="loading || saving || !dirty" @click="save">
+          {{ saving ? "保存中…" : "保存" }}
+        </MiuixButton>
       </div>
     </MiuixCard>
   </div>

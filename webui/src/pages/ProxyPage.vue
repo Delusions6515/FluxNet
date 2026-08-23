@@ -170,36 +170,42 @@ onActivated(load);
 
 <template>
   <div class="page">
-    <MiuixCard class="section section--compact proxy-tabs"
-      ><MiuixTabRow v-model="tab" :tabs="['普通代理', '分应用代理']" contour
-    /></MiuixCard>
+    <MiuixCard class="section section--compact proxy-tabs">
+      <MiuixTabRow v-model="tab" :tabs="['普通代理', '分应用代理']" contour />
+    </MiuixCard>
 
     <div v-show="tab === 0">
-      <MiuixSmallTitle text="代理模式" /><MiuixCard
-        class="section section--compact"
-        ><MiuixDropdownPreference
+      <MiuixSmallTitle text="代理模式" />
+      <MiuixCard class="section section--compact">
+        <MiuixDropdownPreference
           v-model="modeIndex"
           title="代理模式"
           :items="modes"
-      /></MiuixCard>
+        />
+      </MiuixCard>
       <template v-if="isTun">
-        <MiuixSmallTitle text="Tun 设置" /><MiuixCard
-          class="section section--compact"
-          ><MiuixDropdownPreference
+        <MiuixSmallTitle text="Tun 设置" />
+        <MiuixCard class="section section--compact">
+          <MiuixDropdownPreference
             v-model="tunStackIndex"
             title="协议栈"
-            :items="['system', 'gvisor', 'mixed']" /><MiuixSwitchPreference
+            :items="['system', 'gvisor', 'mixed']"
+          />
+          <MiuixSwitchPreference
             :model-value="settings?.auto_redirect"
             title="自动重定向"
             @update:model-value="
               (value) => saveSetting('auto_redirect', value ? '1' : '0')
-            " /><MiuixSwitchPreference
+            "
+          />
+          <MiuixSwitchPreference
             :model-value="settings?.tun_forward"
             title="热点共享转发"
             @update:model-value="
               (value) => saveSetting('tun_forward', value ? '1' : '0')
             "
-        /></MiuixCard>
+          />
+        </MiuixCard>
       </template>
       <ConfigEditor
         v-if="editorVisited && settings"
@@ -211,33 +217,39 @@ onActivated(load);
     </div>
 
     <div v-show="tab === 1">
-      <MiuixSmallTitle text="分应用代理" /><MiuixCard
-        class="section section--compact"
-        ><MiuixSwitchPreference
+      <MiuixSmallTitle text="分应用代理" />
+      <MiuixCard class="section section--compact">
+        <MiuixSwitchPreference
           v-if="settings"
           :model-value="settings.app_proxy_enable"
           title="启用分应用代理"
           @update:model-value="
             (value) => saveSetting('app_proxy_enable', value ? '1' : '0')
-          " /><MiuixDropdownPreference
+          "
+        />
+        <MiuixDropdownPreference
           v-model="appModeIndex"
           title="规则模式"
-          :items="['绕过所选应用', '仅代理所选应用']" /><MiuixSwitchPreference
+          :items="['绕过所选应用', '仅代理所选应用']"
+        />
+        <MiuixSwitchPreference
           v-if="settings"
           :model-value="settings.auto_proxy_apps_enable"
           title="自动生成代理/绕过名单"
           @update:model-value="
             (value) => saveSetting('auto_proxy_apps_enable', value ? '1' : '0')
           "
-      /></MiuixCard>
+        />
+      </MiuixCard>
       <MiuixCard v-if="settings" class="section">
         <div class="page-actions">
           <MiuixButton
             type="secondary"
             :disabled="upgrading"
             @click="upgradeApps"
-            >{{ upgrading ? "更新中…" : "更新预置名单" }}</MiuixButton
           >
+            {{ upgrading ? "更新中…" : "更新预置名单" }}
+          </MiuixButton>
         </div>
       </MiuixCard>
       <MiuixSmallTitle
@@ -247,8 +259,8 @@ onActivated(load);
             : '应用名单'
         "
       />
-      <MiuixCard class="section"
-        ><MiuixInput v-model="query" label="搜索已安装应用" />
+      <MiuixCard class="section">
+        <MiuixInput v-model="query" label="搜索已安装应用" />
         <div class="app-list">
           <button
             v-for="app in visibleApps"
@@ -266,22 +278,24 @@ onActivated(load);
                   event.target.style.display = 'none';
                 }
               "
-            /><span
-              ><strong>{{ app.appLabel }}</strong
-              ><small>{{ app.packageName }}</small></span
-            ><b>{{ selected.includes(app.packageName) ? "已选" : "" }}</b>
+            />
+            <span>
+              <strong>{{ app.appLabel }}</strong>
+              <small>{{ app.packageName }}</small>
+            </span>
+            <b>{{ selected.includes(app.packageName) ? "已选" : "" }}</b>
           </button>
         </div>
         <div class="page-actions">
-          <MiuixButton :disabled="savingApps" @click="saveApps">{{
-            savingApps ? "保存中…" : "保存应用名单"
-          }}</MiuixButton>
-        </div></MiuixCard
-      >
+          <MiuixButton :disabled="savingApps" @click="saveApps">
+            {{ savingApps ? "保存中…" : "保存应用名单" }}
+          </MiuixButton>
+        </div>
+      </MiuixCard>
     </div>
-    <MiuixText v-if="error" class="section error" type="body2">{{
-      error
-    }}</MiuixText>
+    <MiuixText v-if="error" class="section error" type="body2">
+      {{ error }}
+    </MiuixText>
   </div>
 </template>
 

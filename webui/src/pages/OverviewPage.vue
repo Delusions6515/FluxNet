@@ -76,59 +76,66 @@ onBeforeUnmount(clearScheduledRefresh);
 <template>
   <div class="page">
     <MiuixSmallTitle text="运行状态" />
-    <MiuixCard class="section"
-      ><div class="status-grid">
+    <MiuixCard class="section">
+      <div class="status-grid">
         <div>
-          <span class="muted">服务</span
-          ><strong :class="status?.running ? 'ok' : 'error'">{{
-            status?.running ? "运行中" : "未运行"
-          }}</strong>
+          <span class="muted">服务</span>
+          <strong :class="status?.running ? 'ok' : 'error'">
+            {{ status?.running ? "运行中" : "未运行" }}
+          </strong>
         </div>
         <div>
-          <span class="muted">代理模式</span
-          ><strong>{{ status?.mode || "-" }}</strong>
+          <span class="muted">代理模式</span>
+          <strong>{{ status?.mode || "-" }}</strong>
         </div>
         <div>
-          <span class="muted">活跃订阅</span
-          ><strong>{{ data?.subscriptions?.active || "-" }}</strong>
+          <span class="muted">活跃订阅</span>
+          <strong>{{ data?.subscriptions?.active || "-" }}</strong>
         </div>
         <div>
-          <span class="muted">健康检查</span
-          ><strong :class="data?.health?.process_alive ? 'ok' : 'error'">{{
-            data?.health?.process_alive ? "正常" : "异常"
-          }}</strong>
+          <span class="muted">健康检查</span>
+          <strong :class="data?.health?.process_alive ? 'ok' : 'error'">
+            {{ data?.health?.process_alive ? "正常" : "异常" }}
+          </strong>
         </div>
-      </div></MiuixCard
-    >
+      </div>
+    </MiuixCard>
     <MiuixSmallTitle text="服务控制" />
-    <MiuixCard class="section"
-      ><div class="page-actions">
+    <MiuixCard class="section">
+      <div class="page-actions">
         <MiuixButton
           type="primary"
           :disabled="Boolean(busy) || loading || status?.running"
           @click="run('start')"
-          >{{ busy === "start" ? "启动中…" : "启动" }}</MiuixButton
-        ><MiuixButton
+        >
+          {{ busy === "start" ? "启动中…" : "启动" }}
+        </MiuixButton>
+        <MiuixButton
           type="secondary"
           :disabled="Boolean(busy) || loading || !status?.running"
           @click="run('stop')"
-          >{{ busy === "stop" ? "停止中…" : "停止" }}</MiuixButton
-        ><MiuixButton
+        >
+          {{ busy === "stop" ? "停止中…" : "停止" }}
+        </MiuixButton>
+        <MiuixButton
           type="secondary"
           :disabled="Boolean(busy) || loading"
           @click="run('restart')"
-          >{{ busy === "restart" ? "应用中…" : "应用并重启" }}</MiuixButton
-        ><MiuixButton
+        >
+          {{ busy === "restart" ? "应用中…" : "应用并重启" }}
+        </MiuixButton>
+        <MiuixButton
           type="secondary"
           :disabled="Boolean(busy) || loading"
           @click="refresh"
-          >{{ loading ? "刷新中…" : "刷新" }}</MiuixButton
         >
-      </div></MiuixCard
-    >
-    <MiuixText v-if="error" class="section error" type="body2">{{
-      error
-    }}</MiuixText>
+          {{ loading ? "刷新中…" : "刷新" }}
+        </MiuixButton>
+      </div>
+    </MiuixCard>
+    <MiuixText v-if="error" class="section error" type="body2">
+      {{ error }}
+    </MiuixText>
     <OperationLogPanel :entries="data?.logs" />
   </div>
 </template>
