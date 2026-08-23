@@ -102,6 +102,12 @@ func start(layout *paths.Layout, formatJSON bool) {
 		result.Err(formatJSON, "service.start_failed", "启动 sing-box 失败: "+err.Error())
 		return
 	}
+	if err := ensureSingBoxRootCgroup(svcCmd.Process.Pid); err != nil {
+		_ = svcCmd.Process.Kill()
+		_ = svcCmd.Wait()
+		result.Err(formatJSON, "service.cgroup_failed", "sing-box 无法迁移到 root cgroup: "+err.Error())
+		return
+	}
 
 	// Write PID
 	writePID(layout, svcCmd.Process.Pid)
