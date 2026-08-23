@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"os"
@@ -77,7 +78,7 @@ func usage() {
 
 命令:
   service start|stop|restart|status|logs  服务生命周期管理
-  config apply|show|set              运行配置和基础设置
+  config apply|show|set|inbound|tproxy  运行配置和基础设置
   subscription add|update|list|remove|switch  订阅管理
   worker start|stop                  后台 Worker
   health                             健康检查
@@ -152,8 +153,85 @@ func cmdConfig(layout *paths.Layout, args []string) {
 			return
 		}
 		result.Text(result.Success("config.updated", "设置已保存", settings), jsonOutput)
+	case "inbound":
+		cmdConfigInbound(layout, args[1:])
+	case "tproxy":
+		cmdConfigTproxy(layout, args[1:])
 	default:
-		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config apply|show|set <key> <value>")
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config apply|show|set|inbound|tproxy")
+	}
+}
+
+func cmdConfigInbound(layout *paths.Layout, args []string) {
+	if len(args) < 2 {
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config inbound read <mode> | write <mode> <base64-content>")
+		return
+	}
+	mode := args[1]
+	switch args[0] {
+	case "read":
+		if len(args) != 2 {
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config inbound read <mode>")
+			return
+		}
+		content, err := config.ReadUserInbound(layout, mode)
+		if err != nil {
+			result.Err(jsonOutput, "config.inbound_read_failed", err.Error())
+			return
+		}
+		result.Text(result.Success("config.inbound", "用户入站", map[string]string{"content": content}), jsonOutput)
+	case "write":
+		if len(args) != 3 {
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config inbound write <mode> <base64-content>")
+			return
+		}
+		content, err := base64.StdEncoding.DecodeString(args[2])
+		if err == nil {
+			err = config.WriteUserInbound(layout, mode, content)
+		}
+		if err != nil {
+			result.Err(jsonOutput, "config.inbound_write_failed", err.Error())
+			return
+		}
+		result.OK(jsonOutput, "config.inbound_written", "用户入站已保存")
+	default:
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config inbound read|write")
+	}
+}
+
+func cmdConfigTproxy(layout *paths.Layout, args []string) {
+	if len(args) == 0 {
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config tproxy read | write <base64-content>")
+		return
+	}
+	switch args[0] {
+	case "read":
+		if len(args) != 1 {
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config tproxy read")
+			return
+		}
+		content, err := config.ReadUserTproxyConf(layout)
+		if err != nil {
+			result.Err(jsonOutput, "config.tproxy_read_failed", err.Error())
+			return
+		}
+		result.Text(result.Success("config.tproxy", "用户 tproxy.conf", map[string]string{"content": content}), jsonOutput)
+	case "write":
+		if len(args) != 2 {
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config tproxy write <base64-content>")
+			return
+		}
+		content, err := base64.StdEncoding.DecodeString(args[1])
+		if err == nil {
+			err = config.WriteUserTproxyConf(layout, content)
+		}
+		if err != nil {
+			result.Err(jsonOutput, "config.tproxy_write_failed", err.Error())
+			return
+		}
+		result.OK(jsonOutput, "config.tproxy_written", "用户 tproxy.conf 已保存")
+	default:
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet config tproxy read|write")
 	}
 }
 

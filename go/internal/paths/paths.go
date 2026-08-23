@@ -50,6 +50,11 @@ func (l *Layout) InboundData(mode string) string {
 	}
 }
 
+// UserInbound returns the editable inbound override for a proxy mode.
+func (l *Layout) UserInbound(mode string) string {
+	return filepath.Join(l.InboundDataDir(), mode+".json")
+}
+
 // InboundTemplateDir returns the directory containing inbound JSON templates.
 func (l *Layout) InboundTemplateDir() string {
 	return filepath.Join(l.ModuleDir, "config", "inbounds", "tpl")
@@ -123,6 +128,11 @@ func (l *Layout) TproxyConf() string {
 		return dataConf
 	}
 	return l.ModTproxyConf()
+}
+
+// UserTproxyConf returns the editable AndroidTProxyShell configuration path.
+func (l *Layout) UserTproxyConf() string {
+	return filepath.Join(l.ConfigDir(), "tproxy.conf")
 }
 
 // ForceProxyApps returns the force-proxy app list.

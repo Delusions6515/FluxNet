@@ -38,9 +38,37 @@ case "$command" in
     [ "$#" = 3 ] || exit 2
     exec "$FLUXNET" --json config set "$2" "$3"
     ;;
+  config-inbound-read)
+    [ "$#" = 2 ] || exit 2
+    exec "$FLUXNET" --json config inbound read "$2"
+    ;;
+  config-inbound-write)
+    [ "$#" = 3 ] || exit 2
+    exec "$FLUXNET" --json config inbound write "$2" "$3"
+    ;;
+  config-tproxy-read)
+    [ "$#" = 1 ] || exit 2
+    exec "$FLUXNET" --json config tproxy read
+    ;;
+  config-tproxy-write)
+    [ "$#" = 2 ] || exit 2
+    exec "$FLUXNET" --json config tproxy write "$2"
+    ;;
   app-list-replace)
     [ "$#" = 3 ] || exit 2
     exec "$FLUXNET" --json app-list replace "$2" "$3"
+    ;;
+  app-list-force-replace)
+    [ "$#" = 3 ] || exit 2
+    exec "$FLUXNET" --json app-list force-replace "$2" "$3"
+    ;;
+  app-list-upgrade)
+    [ "$#" = 1 ] || exit 2
+    exec "$FLUXNET" --json app-list upgrade
+    ;;
+  app-list-installed)
+    [ "$#" = 1 ] || exit 2
+    exec "$FLUXNET" --json app-list installed
     ;;
   subscription-list)
     exec "$FLUXNET" --json subscription list

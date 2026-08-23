@@ -12,8 +12,14 @@ const state = {
     proxy_mode: "tun",
     app_proxy_enable: false,
     app_proxy_mode: "blacklist",
+    auto_proxy_apps_enable: false,
+    tun_stack: "gvisor",
+    auto_redirect: false,
+    tun_forward: false,
     proxy_apps: [],
     bypass_apps: [],
+    force_proxy_apps: [],
+    force_bypass_apps: [],
   },
   subscriptions: {
     active: "default",
@@ -30,6 +36,13 @@ const state = {
     default:
       '{\n  "inbounds": [],\n  "outbounds": [{ "type": "direct", "tag": "direct" }]\n}\n',
   },
+  inbounds: {
+    tun: '{\n  "type": "tun",\n  "tag": "tun-in"\n}\n',
+    tproxy: '{\n  "type": "tproxy",\n  "tag": "tproxy-in"\n}\n',
+    redirect: '{\n  "type": "redirect",\n  "tag": "redirect-in"\n}\n',
+    ebpf: '{\n  "type": "ebpf",\n  "tag": "ebpf-in"\n}\n',
+  },
+  tproxy: "PROXY_TCP_PORT=1536\n",
 };
 
 const result = (code, message, data) =>
@@ -82,6 +95,30 @@ export function mockGateway(command, args = []) {
       state.settings[args[0] === "whitelist" ? "proxy_apps" : "bypass_apps"] =
         JSON.parse(atob(args[1]));
       return result("app.replaced", "应用名单已保存", state.settings);
+    case "app-list-force-replace": {
+      const key =
+        args[0] === "proxy" ? "force_proxy_apps" : "force_bypass_apps";
+      state.settings[key] = JSON.parse(atob(args[1]));
+      return result("app.force_replaced", "强制应用名单已保存", state.settings);
+    }
+    case "app-list-upgrade":
+      return result("app.upgraded", "预置名单已更新");
+    case "app-list-installed":
+      return result("app.installed", "已安装应用", { apps: MOCK_PACKAGES });
+    case "config-inbound-read":
+      return result("config.inbound", "用户入站", {
+        content: state.inbounds[args[0]],
+      });
+    case "config-inbound-write":
+      state.inbounds[args[0]] = atob(args[1]);
+      return result("config.inbound_written", "用户入站已保存");
+    case "config-tproxy-read":
+      return result("config.tproxy", "用户 tproxy.conf", {
+        content: state.tproxy,
+      });
+    case "config-tproxy-write":
+      state.tproxy = atob(args[0]);
+      return result("config.tproxy_written", "用户 tproxy.conf 已保存");
     case "local-create": {
       const name = args[0];
       state.subscriptions.subscriptions.push({

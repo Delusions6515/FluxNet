@@ -1,11 +1,4 @@
-import {
-  enableEdgeToEdge,
-  exec,
-  getPackagesInfo,
-  listPackages,
-  moduleInfo,
-  spawn,
-} from "kernelsu";
+import { enableEdgeToEdge, exec, moduleInfo, spawn } from "kernelsu";
 import { MOCK_PACKAGES, mockGateway } from "./mock";
 
 export const isBrowserDev = typeof window !== "undefined" && !window.ksu;
@@ -73,6 +66,15 @@ export const getSettings = () => gateway("config-show");
 export const setSetting = (key, value) => gateway("config-set", [key, value]);
 export const replaceAppList = (mode, apps) =>
   gateway("app-list-replace", [mode, encode(JSON.stringify(apps))]);
+export const replaceForceAppList = (kind, apps) =>
+  gateway("app-list-force-replace", [kind, encode(JSON.stringify(apps))]);
+export const upgradeProxyPackageList = () => gateway("app-list-upgrade");
+export const readUserInbound = (mode) => gateway("config-inbound-read", [mode]);
+export const writeUserInbound = (mode, content) =>
+  gateway("config-inbound-write", [mode, encode(content)]);
+export const readUserTproxy = () => gateway("config-tproxy-read");
+export const writeUserTproxy = (content) =>
+  gateway("config-tproxy-write", [encode(content)]);
 export const getSubscriptions = () => gateway("subscription-list");
 export const addRemoteSubscription = (name, url) =>
   gateway("subscription-add-remote", [encode(name), encode(url)]);
@@ -122,18 +124,6 @@ export function serviceAction(action) {
 
 export async function getInstalledApps() {
   if (isBrowserDev) return MOCK_PACKAGES;
-  try {
-    const details = getPackagesInfo(listPackages("user"));
-    if (details.length)
-      return details.map(({ packageName, appLabel }) => ({
-        packageName,
-        appLabel: appLabel || packageName,
-      }));
-  } catch {}
-  const output = await exec("pm list packages");
-  return output.stdout
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => line.replace("package:", ""))
-    .map((packageName) => ({ packageName, appLabel: packageName }));
+  const data = await gateway("app-list-installed");
+  return data.apps || [];
 }
