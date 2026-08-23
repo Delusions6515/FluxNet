@@ -177,4 +177,8 @@ export const MOCK_PACKAGES = [
   { packageName: "com.google.android.youtube", appLabel: "YouTube" },
   { packageName: "org.telegram.messenger", appLabel: "Telegram" },
   { packageName: "com.twitter.android", appLabel: "X" },
+  ...Array.from({ length: 45 }, (_, index) => ({
+    packageName: `com.example.app${String(index + 1).padStart(2, "0")}`,
+    appLabel: `示例应用 ${index + 1}`,
+  })),
 ];

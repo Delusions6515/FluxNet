@@ -41,6 +41,7 @@ body {
 }
 .app-shell__body .m-scroll-area__content {
   display: flex;
+  height: 100%;
   min-height: 100%;
 }
 .app-shell__bottom {
