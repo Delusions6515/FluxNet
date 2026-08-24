@@ -38,7 +38,7 @@ type ChannelInfo struct {
 	Installed bool   `json:"installed"`
 }
 
-// Status reads the configured channel/ABI and the installed binary version.
+// Status reads the configured channel/ABI and the recorded kernel version.
 func Status(layout *paths.Layout) ChannelInfo {
 	info := ChannelInfo{Channel: defaultChannel, ABI: defaultABI}
 	kv := readConfigKV(layout.ConfigFile())
@@ -48,8 +48,11 @@ func Status(layout *paths.Layout) ChannelInfo {
 	if v, ok := kv["kernel_abi"]; ok && v != "" {
 		info.ABI = v
 	}
+	if v, ok := kv["kernel_version"]; ok && v != "" {
+		info.Version = v
+	}
 	info.Installed = fileExists(layout.SingBoxBin())
-	if info.Installed {
+	if info.Installed && info.Version == "" {
 		info.Version = kernelVersion(layout.SingBoxBin())
 	}
 	return info
@@ -113,6 +116,9 @@ func Install(layout *paths.Layout) (string, error) {
 	}
 	if err := os.Rename(tmp, layout.SingBoxBin()); err != nil {
 		os.Remove(tmp)
+		return "", err
+	}
+	if err := writeConfigValue(layout.ConfigFile(), "kernel_version", version, false); err != nil {
 		return "", err
 	}
 	return version, nil
