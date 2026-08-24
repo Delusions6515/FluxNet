@@ -126,19 +126,23 @@ watch(
   flex-direction: column;
 }
 .json-editor__code {
+  display: flex;
+  flex-direction: column;
   flex: 1;
-  min-height: 300px;
+  min-height: 0;
 }
 .json-editor__code :deep(.cm-editor),
 .json-editor__code :deep(.cm-scroller) {
+  flex: 1 1 0;
+  min-height: 0;
   height: 100%;
-  min-height: 300px;
   font:
     13px/1.55 "JetBrains Mono Variable",
     monospace;
 }
 .json-editor__error,
 .json-editor__actions {
+  flex: none;
   margin-top: 12px;
 }
 </style>

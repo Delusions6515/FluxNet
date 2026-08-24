@@ -247,6 +247,7 @@ onActivated(load);
 .editor-page {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
 }
 .editor-page__back {

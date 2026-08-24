@@ -127,13 +127,16 @@ watch(
 
 <style scoped>
 .config-editor__code {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
 }
 .config-editor__code :deep(.cm-editor),
 .config-editor__code :deep(.cm-scroller) {
-  height: 100%;
+  flex: 1 1 0;
   min-height: 0;
+  height: 100%;
   font:
     13px/1.55 "JetBrains Mono Variable",
     monospace;
@@ -157,6 +160,7 @@ watch(
 }
 .config-editor__error,
 .config-editor__actions {
+  flex: none;
   margin-top: 12px;
 }
 </style>
