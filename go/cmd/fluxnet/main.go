@@ -11,6 +11,7 @@ import (
 	"github.com/Delusions6515/FluxNet/internal/app"
 	"github.com/Delusions6515/FluxNet/internal/config"
 	"github.com/Delusions6515/FluxNet/internal/health"
+	"github.com/Delusions6515/FluxNet/internal/kernel"
 	"github.com/Delusions6515/FluxNet/internal/logs"
 	"github.com/Delusions6515/FluxNet/internal/paths"
 	"github.com/Delusions6515/FluxNet/internal/result"
@@ -59,6 +60,8 @@ func main() {
 		cmdHealth(layout, args[1:])
 	case "app-list":
 		cmdAppList(layout, args[1:])
+	case "kernel":
+		cmdKernel(layout, args[1:])
 	case "version":
 		cmdVersion()
 	case "help", "-h", "--help":
@@ -83,6 +86,7 @@ func usage() {
   worker start|stop                  后台 Worker
   health                             健康检查
 	app-list show|catalog|upgrade|replace|force-replace  应用名单管理
+  kernel status|set-channel <渠道>|upgrade|verify  内核渠道与更新
   version                            版本信息
   help                               帮助
 
@@ -369,4 +373,53 @@ func cmdAppList(layout *paths.Layout, args []string) {
 
 func cmdHealth(layout *paths.Layout, args []string) {
 	health.Check(layout, jsonOutput)
+}
+
+func cmdKernel(layout *paths.Layout, args []string) {
+	if len(args) == 0 {
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet kernel status|set-channel <channel>|<upgrade>|<verify>")
+		return
+	}
+	switch args[0] {
+	case "status":
+		result.Text(result.Success("kernel.status", "内核状态", kernel.Status(layout)), jsonOutput)
+	case "set-channel":
+		if len(args) < 2 {
+			result.Err(jsonOutput, "usage.invalid", "用法: fluxnet kernel set-channel <channel> [abi]")
+			return
+		}
+		abi := ""
+		if len(args) > 2 {
+			abi = args[2]
+		}
+		if err := kernel.SetChannel(layout, args[1], abi); err != nil {
+			result.Err(jsonOutput, "kernel.set_channel_failed", err.Error())
+			return
+		}
+		result.Text(result.Success("kernel.channel_set", "内核渠道已更新", kernel.Status(layout)), jsonOutput)
+	case "upgrade":
+		if err := kernel.Verify(layout); err != nil {
+			result.Err(jsonOutput, "kernel.verify_failed", err.Error())
+			return
+		}
+		version, err := kernel.Install(layout)
+		if err != nil {
+			result.Err(jsonOutput, "kernel.install_failed", err.Error())
+			return
+		}
+		if err := kernel.Verify(layout); err != nil {
+			result.Err(jsonOutput, "kernel.verify_failed", "更新后内核验证失败: "+err.Error())
+			return
+		}
+		result.Text(result.Success("kernel.upgraded", "内核已更新到 "+version,
+			map[string]any{"channel": kernel.Status(layout).Channel, "version": version}), jsonOutput)
+	case "verify":
+		if err := kernel.Verify(layout); err != nil {
+			result.Err(jsonOutput, "kernel.verify_failed", err.Error())
+			return
+		}
+		result.OK(jsonOutput, "kernel.verified", "内核验证通过")
+	default:
+		result.Err(jsonOutput, "usage.invalid", "用法: fluxnet kernel status|set-channel <channel>|<upgrade>|<verify>")
+	}
 }

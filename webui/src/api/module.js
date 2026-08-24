@@ -100,6 +100,12 @@ export function serviceAction(action) {
   return gateway(`service-${action}`);
 }
 
+export const getKernelStatus = () => gateway("kernel-status");
+export const setKernelChannel = (channel, abi) =>
+  gateway("kernel-set-channel", [channel, abi]);
+export const upgradeKernel = () => gateway("kernel-upgrade");
+export const verifyKernel = () => gateway("kernel-verify");
+
 export async function getInstalledApps() {
   if (isBrowserDev) return MOCK_PACKAGES;
   const packages = listPackages("all");

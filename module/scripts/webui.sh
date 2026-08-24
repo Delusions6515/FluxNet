@@ -70,6 +70,22 @@ case "$command" in
     [ "$#" = 1 ] || exit 2
     exec "$FLUXNET" --json app-list catalog
     ;;
+  kernel-status)
+    [ "$#" = 1 ] || exit 2
+    exec "$FLUXNET" --json kernel status
+    ;;
+  kernel-set-channel)
+    [ "$#" = 3 ] || exit 2
+    exec "$FLUXNET" --json kernel set-channel "$2" "$3"
+    ;;
+  kernel-upgrade)
+    [ "$#" = 1 ] || exit 2
+    exec "$FLUXNET" --json kernel upgrade
+    ;;
+  kernel-verify)
+    [ "$#" = 1 ] || exit 2
+    exec "$FLUXNET" --json kernel verify
+    ;;
   subscription-list)
     exec "$FLUXNET" --json subscription list
     ;;

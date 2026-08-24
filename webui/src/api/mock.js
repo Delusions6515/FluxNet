@@ -32,6 +32,12 @@ const state = {
       },
     ],
   },
+  kernel: {
+    channel: "delusions6515-pre",
+    abi: "arm64-v8a",
+    version: "1.12.0",
+    installed: true,
+  },
   local: {
     default:
       '{\n  "inbounds": [],\n  "outbounds": [{ "type": "direct", "tag": "direct" }]\n}\n',
@@ -163,6 +169,17 @@ export function mockGateway(command, args = []) {
       });
       return result("subscription.added", "订阅已添加");
     }
+    case "kernel-status":
+      return result("kernel.status", "内核状态", state.kernel);
+    case "kernel-set-channel":
+      state.kernel.channel = args[0];
+      if (args[1]) state.kernel.abi = args[1];
+      return result("kernel.channel_set", "内核渠道已更新", state.kernel);
+    case "kernel-upgrade":
+      state.kernel.version = "1.13.0";
+      return result("kernel.upgraded", "内核已更新到 1.13.0", state.kernel);
+    case "kernel-verify":
+      return result("kernel.verified", "内核验证通过", state.kernel);
     default:
       return JSON.stringify({
         schema: 1,
