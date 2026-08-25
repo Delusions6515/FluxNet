@@ -2,7 +2,6 @@
   "type": "ebpf",
   "tag": "ebpf-in",
   "mode": "local",
-  "dns_mode": "hijack",
   "bypass_rule_set": [],
   "local": {
     "ipv6_mode": "auto",
