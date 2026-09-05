@@ -18,7 +18,7 @@
     "miuix-vue": "^0.1.1",
     "motion-v": "^2.4.0",
     "subsetted-fonts": "^1.0.5",
-    "vue": "^3.5.41",
+    "vue": "^3.5.42",
     "vue-codemirror": "^6.1.1"
   },
   "devDependencies": {
